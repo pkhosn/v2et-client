@@ -1,0 +1,51 @@
+name: Windows Quick Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to build
+        required: false
+        default: main
+
+concurrency:
+  group: windows-quick-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-portable:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.ref || 'main' }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: 3.38.5
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Pack portable zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "out/v2et-windows-portable.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-quick-portable
+          path: out/v2et-windows-portable.zip
+          retention-days: 7

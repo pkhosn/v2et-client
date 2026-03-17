@@ -26,11 +26,13 @@ When starting a new session, read in order:
 - Last subscription package/line info is persisted and shown in V2ET dialog
 - V2ET mode now has dedicated pages: Dashboard / Store / Me
 - Router switches to V2ET 3-tab shell when `enable_v2et_adapter` is true
+- Dashboard now includes speed panel and quick Smart/Global/TUN mode switches
+- Store/Me pages now use portal data providers (banner/notice/support list)
 
 ## Next Tasks (in order)
-1. Refine new Dashboard/Store/Me visual details to match design draft precisely
+1. Refine spacing/color/typography to match provided screenshots 1:1
 2. Move V2ET dialog/page strings into translation assets (currently runtime zh/en mapping)
-3. Wire Store/Me data from real APIs (announcements, tickets, plans, support)
+3. Replace portal placeholder providers with real panel APIs
 4. Add tests for token parsing, subscribe URL parsing, and V2ET shell routes
 
 ## Working Rules

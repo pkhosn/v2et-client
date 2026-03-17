@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -10,15 +11,7 @@ class V2etMePage extends ConsumerWidget {
     final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
     String tr(String a, String b) => zh ? a : b;
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
-
-    final items = [
-      tr('订单记录', 'Orders'),
-      tr('流量明细', 'Traffic Details'),
-      tr('我的工单', 'My Tickets'),
-      tr('在线客服', 'Support'),
-      tr('邀请管理', 'Invites'),
-      tr('礼品卡兑换', 'Gift Card'),
-    ];
+    final items = ref.watch(v2etSupportEntriesProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('我的', 'Me'))),
@@ -37,10 +30,22 @@ class V2etMePage extends ConsumerWidget {
           for (final item in items)
             Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              child: ListTile(title: Text(item), trailing: const Icon(Icons.chevron_right_rounded)),
+              child: ListTile(title: Text(zh ? item.title : _enLabel(item.route, item.title)), trailing: const Icon(Icons.chevron_right_rounded)),
             ),
         ],
       ),
     );
+  }
+
+  String _enLabel(String route, String fallback) {
+    return switch (route) {
+      'orders' => 'Orders',
+      'traffic' => 'Traffic Details',
+      'tickets' => 'Tickets',
+      'support' => 'Support',
+      'invites' => 'Invites',
+      'gift-card' => 'Gift Card',
+      _ => fallback,
+    };
   }
 }

@@ -55,6 +55,14 @@
   - New pages: Dashboard / Store / Me
   - Router switches to 3-tab V2ET layout when adapter is enabled
   - Navigation labels/icons aligned with provided design direction
+- Upgraded Dashboard to product-ready interaction:
+  - Account + package card with traffic progress
+  - Real-time up/down speed panel
+  - Smart/Global/TUN quick mode switches mapped to service mode
+  - One-click login entry when account is not saved
+- Added Store/Me data scaffolding:
+  - Banner + notice modules for store page
+  - Support entries module for Me page (orders/tickets/support/invite/gift card)
 - Added acceptance checklist:
   - `docs/v2et/ACCEPTANCE_CHECKLIST.md`
 

@@ -7,3 +7,6 @@ export 'model/v2board_credentials.dart';
 export 'model/v2board_session.dart';
 export 'model/v2board_subscription.dart';
 export 'presentation/v2et_quick_import_dialog.dart';
+export 'presentation/v2et_dashboard_page.dart';
+export 'presentation/v2et_store_page.dart';
+export 'presentation/v2et_me_page.dart';

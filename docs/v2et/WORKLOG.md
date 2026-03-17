@@ -51,6 +51,10 @@
 - Added package/line information persistence and display:
   - Last subscription metadata saved locally
   - V2ET login dialog now displays current package summary card
+- Added V2ET-first UI shell (rapid first pass):
+  - New pages: Dashboard / Store / Me
+  - Router switches to 3-tab V2ET layout when adapter is enabled
+  - Navigation labels/icons aligned with provided design direction
 - Added acceptance checklist:
   - `docs/v2et/ACCEPTANCE_CHECKLIST.md`
 

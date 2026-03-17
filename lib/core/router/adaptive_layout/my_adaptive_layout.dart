@@ -16,15 +16,18 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     required this.navigationShell,
     required this.isMobileBreakpoint,
     required this.showProfilesAction,
+    this.v2etMode = false,
   });
   // managed by go router(Shell Route)
   final StatefulNavigationShell navigationShell;
   final bool isMobileBreakpoint;
   final bool showProfilesAction;
+  final bool v2etMode;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
     // focus switch management
     final primaryFocusHash = useState<int?>(null);
     final navScopeNode = useFocusScopeNode();
@@ -37,14 +40,13 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         } else {
           // focus node does not change => true.
           if (primaryFocusHash.value == FocusManager.instance.primaryFocus.hashCode) {
-            if (branchesScope.values.any((node) => node.hasFocus)) {
-              navScopeNode.requestFocus();
-            } else if (navScopeNode.hasFocus) {
-              branchesScope[getNameOfBranch(isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex)]
-                  ?.requestFocus();
+              if (branchesScope.values.any((node) => node.hasFocus)) {
+                navScopeNode.requestFocus();
+              } else if (navScopeNode.hasFocus) {
+                branchesScope[_scopeKeyForIndex()]?.requestFocus();
+              }
             }
           }
-        }
         return true;
       }
 
@@ -63,7 +65,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                     node: navScopeNode,
                     child: NavigationRail(
                       extended: Breakpoint(context).isDesktop(),
-                      destinations: _navRailDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                      destinations: _navRailDests(_actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode)),
                       selectedIndex: navigationShell.currentIndex,
                       onDestinationSelected: (index) => _onTap(context, index),
                       trailing: Breakpoint(context).isDesktop()
@@ -83,8 +85,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
             ? FocusScope(
                 node: navScopeNode,
                 child: NavigationBar(
-                  selectedIndex: navigationShell.currentIndex <= 1 ? navigationShell.currentIndex : 0,
-                  destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
+                  selectedIndex: v2etMode ? navigationShell.currentIndex : (navigationShell.currentIndex <= 1 ? navigationShell.currentIndex : 0),
+                  destinations: _navDests(_actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode)),
                   onDestinationSelected: (index) => _onTap(context, index),
                 ),
               )
@@ -98,13 +100,39 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
   }
 
-  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
-    ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
-    if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
-    ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title),
-  ];
+  String _scopeKeyForIndex() {
+    if (v2etMode) {
+      return switch (navigationShell.currentIndex) {
+        0 => 'home',
+        1 => 'profiles',
+        _ => 'about',
+      };
+    }
+    return getNameOfBranch(isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex);
+  }
+
+  List<ShellRouteAction> _actions(
+    Translations t,
+    bool zh,
+    bool showProfilesAction,
+    bool isMobileBreakpoint,
+    bool v2etMode,
+  ) {
+    if (v2etMode) {
+      return [
+        ShellRouteAction(Icons.dashboard_customize_rounded, zh ? '仪表盘' : 'Dashboard'),
+        ShellRouteAction(Icons.shopping_bag_rounded, zh ? '商店' : 'Store'),
+        ShellRouteAction(Icons.account_circle_rounded, zh ? '我的' : 'Me'),
+      ];
+    }
+    return [
+      ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
+      if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
+      ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
+      if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
+      if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title),
+    ];
+  }
 
   List<NavigationDestination> _navDests(List<ShellRouteAction> actions) =>
       actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();

@@ -24,12 +24,14 @@ When starting a new session, read in order:
 - Verified on real provided panel that subscribe endpoint expects raw token auth style
 - UX aligned to "login then auto sync" (no manual subscription import action)
 - Last subscription package/line info is persisted and shown in V2ET dialog
+- V2ET mode now has dedicated pages: Dashboard / Store / Me
+- Router switches to V2ET 3-tab shell when `enable_v2et_adapter` is true
 
 ## Next Tasks (in order)
-1. Move V2ET dialog strings into translation assets (currently runtime zh/en mapping)
-2. Validate endpoint compatibility against multiple real V2Board panel versions
-3. Add tests for token parsing, subscribe URL parsing, and import integration
-4. Surface package details in a dedicated V2ET status card (optional)
+1. Refine new Dashboard/Store/Me visual details to match design draft precisely
+2. Move V2ET dialog/page strings into translation assets (currently runtime zh/en mapping)
+3. Wire Store/Me data from real APIs (announcements, tickets, plans, support)
+4. Add tests for token parsing, subscribe URL parsing, and V2ET shell routes
 
 ## Working Rules
 - Keep changes small and commit often

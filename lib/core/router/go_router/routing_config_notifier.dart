@@ -23,6 +23,9 @@ import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart
 import 'package:hiddify/features/settings/overview/sections/warp_options_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:hiddify/v2et/presentation/v2et_dashboard_page.dart';
+import 'package:hiddify/v2et/presentation/v2et_me_page.dart';
+import 'package:hiddify/v2et/presentation/v2et_store_page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'routing_config_notifier.g.dart';
@@ -54,6 +57,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
   @override
   RoutingConfig build() {
     final isMobileBreakpoint = ref.watch(isMobileBreakpointProvider);
+    final v2etMode = ref.watch(Preferences.enableV2etAdapter);
     final bool showProfilesAction;
     if (isMobileBreakpoint == true) {
       showProfilesAction = false;
@@ -98,8 +102,37 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
             navigationShell: navigationShell,
             isMobileBreakpoint: isMobileBreakpoint,
             showProfilesAction: showProfilesAction,
+            v2etMode: v2etMode,
           ),
-          branches: <StatefulShellBranch>[
+          branches: v2etMode ? <StatefulShellBranch>[
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'home',
+                  path: '/home',
+                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const V2etDashboardPage()),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'store',
+                  path: '/store',
+                  builder: (_, _) => FocusScope(node: branchesScope['profiles'], child: const V2etStorePage()),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <GoRoute>[
+                GoRoute(
+                  name: 'me',
+                  path: '/me',
+                  builder: (_, _) => FocusScope(node: branchesScope['about'], child: const V2etMePage()),
+                ),
+              ],
+            ),
+          ] : <StatefulShellBranch>[
             StatefulShellBranch(
               routes: <GoRoute>[
                 GoRoute(

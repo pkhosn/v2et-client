@@ -7,6 +7,7 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/profile/add/widgets/widgets.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:hiddify/v2et/presentation/v2et_quick_import_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class FixBtns extends ConsumerWidget {
@@ -53,6 +54,19 @@ class FixBtns extends ConsumerWidget {
           icon: Icons.add,
           onTap: () {
             ref.read(addProfilePageNotifierProvider.notifier).goManual();
+          },
+        ),
+        const Gap(AddProfileModalConst.fixBtnsGap),
+        FixBtn(
+          key: const ValueKey('add_v2et_button'),
+          height: height,
+          title: 'V2ET',
+          icon: Icons.cloud_download,
+          onTap: () async {
+            await showDialog<void>(
+              context: context,
+              builder: (_) => const V2etQuickImportDialog(),
+            );
           },
         ),
         const Gap(AddProfileModalConst.fixBtnsGap),

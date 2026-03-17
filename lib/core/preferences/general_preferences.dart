@@ -110,6 +110,8 @@ abstract class Preferences {
     mapFrom: ActionsAtClosing.values.byName,
     mapTo: (value) => value.name,
   );
+
+  static final enableV2etAdapter = PreferencesNotifier.create<bool, bool>("enable_v2et_adapter", false);
 }
 
 @Riverpod(keepAlive: true)

@@ -26,6 +26,7 @@ import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hiddify/riverpod_observer.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -85,6 +86,8 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   await _init("profile repository", () => container.read(profileRepositoryProvider.future));
 
   await _init("translations", () => container.read(translationsProvider.future));
+
+  await _safeInit("v2et adapter", () => container.read(v2etBootstrapProvider.future), timeout: 1000);
 
   await _safeInit("active profile", () => container.read(activeProfileProvider.future), timeout: 1000);
   await _init("hiddify-core", () => container.read(hiddifyCoreServiceProvider).init());

@@ -11,7 +11,7 @@ class V2etMePage extends ConsumerWidget {
     final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
     String tr(String a, String b) => zh ? a : b;
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
-    final items = ref.watch(v2etSupportEntriesProvider);
+    final items = ref.watch(v2etSupportEntriesProvider).valueOrNull ?? const [];
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('我的', 'Me'))),
@@ -31,6 +31,11 @@ class V2etMePage extends ConsumerWidget {
             Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               child: ListTile(title: Text(zh ? item.title : _enLabel(item.route, item.title)), trailing: const Icon(Icons.chevron_right_rounded)),
+            ),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Center(child: Text(tr('暂无个人数据', 'No account data yet'))),
             ),
         ],
       ),

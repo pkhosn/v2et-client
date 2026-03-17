@@ -16,3 +16,21 @@ class V2etSupportEntry {
   final String title;
   final String route;
 }
+
+class V2etStoreOffer {
+  const V2etStoreOffer({
+    required this.name,
+    required this.price,
+    this.cycleLabel,
+    this.traffic,
+    this.speed,
+    this.deviceLimit,
+  });
+
+  final String name;
+  final double price;
+  final String? cycleLabel;
+  final int? traffic;
+  final String? speed;
+  final int? deviceLimit;
+}

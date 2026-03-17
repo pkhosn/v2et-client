@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_credentials_store.dart';
 import 'package:hiddify/v2et/data/v2et_endpoint_resolver.dart';
+import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/data/v2et_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -20,6 +21,10 @@ final v2etCredentialsStoreProvider = Provider<V2etCredentialsStore>((ref) {
     preferences: ref.watch(sharedPreferencesProvider).requireValue,
     secureStorage: ref.watch(v2etSecureStorageProvider),
   );
+});
+
+final v2etSessionProvider = FutureProvider<V2boardSession?>((ref) async {
+  return await ref.watch(v2etCredentialsStoreProvider).readSession();
 });
 
 final v2boardApiProvider = Provider<V2boardApi>((ref) {

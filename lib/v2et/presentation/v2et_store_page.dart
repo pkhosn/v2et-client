@@ -11,12 +11,8 @@ class V2etStorePage extends ConsumerWidget {
     final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
     String tr(String a, String b) => zh ? a : b;
     final banners = ref.watch(v2etBannersProvider);
-    final notices = ref.watch(v2etNoticesProvider);
-    final cards = [
-      (name: 'VIP1', price: '30.00', cycle: tr('/月付', '/month')),
-      (name: 'VIP2', price: '30.00', cycle: tr('/月付', '/month')),
-      (name: 'VIP3', price: '30.00', cycle: tr('/一次性', '/one-time')),
-    ];
+    final notices = ref.watch(v2etNoticesProvider).valueOrNull ?? const [];
+    final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const [];
     return Scaffold(
       appBar: AppBar(title: Text(tr('商店', 'Store'))),
       body: ListView(
@@ -61,7 +57,7 @@ class V2etStorePage extends ConsumerWidget {
             ],
           ),
           const Gap(12),
-          for (final c in cards)
+          for (final c in offers)
             Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               child: Padding(
@@ -71,15 +67,37 @@ class V2etStorePage extends ConsumerWidget {
                   children: [
                     Text(c.name, style: Theme.of(context).textTheme.headlineSmall),
                     const Gap(6),
-                    Text('¥${c.price} ${c.cycle}', style: Theme.of(context).textTheme.titleLarge),
+                    Text('¥${c.price.toStringAsFixed(2)} ${c.cycleLabel ?? tr('/周期', '/period')}', style: Theme.of(context).textTheme.titleLarge),
+                    const Gap(8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        if (c.traffic != null) Chip(label: Text('${_bytes(c.traffic)} ${tr('流量', 'Traffic')}')),
+                        if (c.speed != null) Chip(label: Text(c.speed!)),
+                        if (c.deviceLimit != null) Chip(label: Text('${c.deviceLimit} ${tr('设备', 'devices')}')),
+                      ],
+                    ),
                     const Gap(10),
                     FilledButton(onPressed: () {}, child: Text(tr('立即购买', 'Buy Now'))),
                   ],
                 ),
               ),
             ),
+          if (offers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Center(child: Text(tr('暂无套餐数据', 'No plans available yet'))),
+            ),
         ],
       ),
     );
+  }
+
+  String _bytes(int? value) {
+    if (value == null || value <= 0) return '0GB';
+    final gb = value / (1024 * 1024 * 1024);
+    if (gb >= 1) return '${gb.toStringAsFixed(gb >= 100 ? 0 : 2)}GB';
+    final mb = value / (1024 * 1024);
+    return '${mb.toStringAsFixed(mb >= 100 ? 0 : 2)}MB';
   }
 }

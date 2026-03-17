@@ -28,11 +28,12 @@ When starting a new session, read in order:
 - Router switches to V2ET 3-tab shell when `enable_v2et_adapter` is true
 - Dashboard now includes speed panel and quick Smart/Global/TUN mode switches
 - Store/Me pages now use portal data providers (banner/notice/support list)
+- Portal providers now fetch real data from panel APIs (notices/plans/orders/tickets)
 
 ## Next Tasks (in order)
 1. Refine spacing/color/typography to match provided screenshots 1:1
 2. Move V2ET dialog/page strings into translation assets (currently runtime zh/en mapping)
-3. Replace portal placeholder providers with real panel APIs
+3. Add fallback mapping for more panel variants in plan/notice response schema
 4. Add tests for token parsing, subscribe URL parsing, and V2ET shell routes
 
 ## Working Rules

@@ -2,6 +2,7 @@ export 'data/v2board_api.dart';
 export 'data/v2et_credentials_store.dart';
 export 'data/v2et_data_providers.dart';
 export 'data/v2et_endpoint_resolver.dart';
+export 'data/v2et_portal_api.dart';
 export 'data/v2et_repository.dart';
 export 'model/v2board_credentials.dart';
 export 'model/v2board_session.dart';

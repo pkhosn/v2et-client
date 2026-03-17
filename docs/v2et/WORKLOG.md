@@ -63,6 +63,10 @@
 - Added Store/Me data scaffolding:
   - Banner + notice modules for store page
   - Support entries module for Me page (orders/tickets/support/invite/gift card)
+- Replaced Store/Me placeholder data with API-driven providers:
+  - Added portal API client for notices/plans/order counters/ticket counters
+  - Added authenticated fetch with token-style fallback
+  - Store and Me pages now consume async providers and show live counts
 - Added acceptance checklist:
   - `docs/v2et/ACCEPTANCE_CHECKLIST.md`
 

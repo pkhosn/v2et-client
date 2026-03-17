@@ -41,7 +41,9 @@ jobs:
         run: flutter config --enable-windows-desktop
 
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          dart run slang
 
       - name: Build Windows release
         run: flutter build windows --release --target=lib/main.dart

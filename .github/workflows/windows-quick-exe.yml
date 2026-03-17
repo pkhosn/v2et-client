@@ -46,6 +46,14 @@ jobs:
           SENTRY_DSN: ''
         run: make windows-exe-release
 
+      - name: Fallback build runner exe
+        shell: bash
+        run: |
+          if ! ls dist/*/*.exe >/dev/null 2>&1; then
+            echo "No installer found from fastforge, building runner exe fallback"
+            flutter build windows --release --target=lib/main.dart
+          fi
+
       - name: Collect EXE artifact
         shell: pwsh
         run: |
@@ -53,7 +61,7 @@ jobs:
           Get-ChildItem -Path dist -Recurse | Select-Object FullName
           $exe = Get-ChildItem -Path dist -Recurse -Filter "*.exe" | Select-Object -First 1
           if (-not $exe) {
-            $runnerExe = Get-ChildItem -Path "build/windows/x64/runner/Release" -Filter "*.exe" | Select-Object -First 1
+            $runnerExe = Get-ChildItem -Path "build/windows" -Recurse -Filter "*.exe" | Select-Object -First 1
             if (-not $runnerExe) { throw "No .exe found in dist or build output" }
             Copy-Item $runnerExe.FullName "out/v2et-windows-runner.exe" -Force
           } else {

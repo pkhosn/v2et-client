@@ -1,0 +1,61 @@
+name: Windows Quick EXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to build
+        required: false
+        default: main
+
+concurrency:
+  group: windows-quick-exe-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.38.5'
+  IS_GITHUB_ACTIONS: 1
+  CHANNEL: dev
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.ref || 'main' }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Prepare dependencies
+        shell: bash
+        run: |
+          make windows-install-deps
+          make windows-prepare
+
+      - name: Build EXE installer
+        shell: bash
+        env:
+          SENTRY_DSN: ''
+        run: make windows-exe-release
+
+      - name: Collect EXE artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path out -Force | Out-Null
+          $exe = Get-ChildItem -Path dist -Recurse -Filter "*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No .exe installer found in dist directory" }
+          Copy-Item $exe.FullName "out/v2et-windows-setup.exe" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-quick-exe
+          path: out/v2et-windows-setup.exe
+          retention-days: 7

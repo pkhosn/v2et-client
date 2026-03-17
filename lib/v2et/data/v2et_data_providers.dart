@@ -49,3 +49,5 @@ final v2etBootstrapProvider = FutureProvider<void>((ref) async {
   }
   await ref.watch(v2etRepositoryProvider).warmup();
 });
+
+final v2etSessionUnlockedProvider = StateProvider<bool>((ref) => false);

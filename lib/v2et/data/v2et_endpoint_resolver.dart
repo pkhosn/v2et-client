@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 class V2etEndpointResolver {
@@ -33,7 +35,11 @@ class V2etEndpointResolver {
     }
 
     for (final path in _configPathCandidates) {
-      final candidate = normalized.replace(path: path, query: null, fragment: null);
+      final candidate = normalized.replace(
+        path: path,
+        query: null,
+        fragment: null,
+      );
       final extracted = await _tryExtractApiUrl(candidate);
       if (extracted != null) {
         return _normalizeBase(extracted);
@@ -45,7 +51,13 @@ class V2etEndpointResolver {
 
   Future<Uri?> _tryExtractApiUrl(Uri uri) async {
     try {
-      final response = await _dio.getUri<Object?>(uri, options: Options(headers: {'Accept': 'application/json'}));
+      final response = await _dio.getUri<Object?>(
+        uri,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {'Accept': 'application/json,text/plain,*/*'},
+        ),
+      );
       final map = _asStringMap(response.data);
       if (map == null) {
         return null;
@@ -76,7 +88,9 @@ class V2etEndpointResolver {
       if (value is List) {
         for (final item in value) {
           if (item is Map) {
-            final nested = _findUrl(item.map((k, v) => MapEntry(k.toString(), v)));
+            final nested = _findUrl(
+              item.map((k, v) => MapEntry(k.toString(), v)),
+            );
             if (nested != null) {
               return nested;
             }
@@ -94,6 +108,32 @@ class V2etEndpointResolver {
     }
     if (value is Map) {
       return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    if (value is List<int>) {
+      final text = utf8.decode(value, allowMalformed: true);
+      return _decodeJsonMap(text);
+    }
+    if (value is String) {
+      return _decodeJsonMap(value);
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _decodeJsonMap(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      }
+    } catch (_) {
+      return null;
     }
     return null;
   }

@@ -1,3 +1,4 @@
+export 'config/v2et_bootstrap_config.dart';
 export 'data/v2board_api.dart';
 export 'data/v2et_credentials_store.dart';
 export 'data/v2et_data_providers.dart';
@@ -10,6 +11,7 @@ export 'model/v2board_subscription.dart';
 export 'model/v2et_portal_models.dart';
 export 'presentation/v2et_quick_import_dialog.dart';
 export 'presentation/v2et_dashboard_page.dart';
+export 'presentation/v2et_login_page.dart';
 export 'presentation/v2et_store_page.dart';
 export 'presentation/v2et_me_page.dart';
 export 'data/v2et_portal_provider.dart';

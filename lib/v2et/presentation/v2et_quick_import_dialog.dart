@@ -16,15 +16,22 @@ class V2etQuickImportDialog extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
-    final localeCode = Localizations.localeOf(context).languageCode.toLowerCase();
+    final localeCode = Localizations.localeOf(
+      context,
+    ).languageCode.toLowerCase();
     final zh = localeCode.startsWith('zh');
 
-    String tr({required String zhText, required String enText}) => zh ? zhText : enText;
+    String tr({required String zhText, required String enText}) =>
+        zh ? zhText : enText;
 
-    final savedCredentialsFuture = useMemoized(() => ref.read(v2etRepositoryProvider).readSavedCredentials());
+    final savedCredentialsFuture = useMemoized(
+      () => ref.read(v2etRepositoryProvider).readSavedCredentials(),
+    );
     final savedCredentialsState = useFuture(savedCredentialsFuture);
     final savedCredentials = savedCredentialsState.data;
-    final lastSubscription = ref.watch(v2etRepositoryProvider).readLastSubscription();
+    final lastSubscription = ref
+        .watch(v2etRepositoryProvider)
+        .readLastSubscription();
     final formKey = useMemoized(GlobalKey<FormState>.new);
     final baseUrlController = useTextEditingController();
     final emailController = useTextEditingController();
@@ -58,24 +65,35 @@ class V2etQuickImportDialog extends HookConsumerWidget {
       loading.value = true;
       try {
         final inputBase = Uri.parse(baseUrlController.text.trim());
-        final resolvedBase = await ref.read(v2etEndpointResolverProvider).resolveBaseUrl(inputBase);
+        final resolvedBase = await ref
+            .read(v2etEndpointResolverProvider)
+            .resolveBaseUrl(inputBase);
         final credentials = V2boardCredentials(
           baseUrl: resolvedBase,
           email: emailController.text.trim(),
           password: passwordController.text,
         );
         await ref.read(Preferences.enableV2etAdapter.notifier).update(true);
-        final subscription = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
-        await ref.read(addProfileNotifierProvider.notifier).addClipboard(subscription.subscriptionUrl.toString());
+        final subscription = await ref
+            .read(v2etRepositoryProvider)
+            .loginAndFetchSubscription(credentials);
+        await ref
+            .read(addProfileNotifierProvider.notifier)
+            .addClipboard(subscription.subscriptionUrl.toString());
+        ref.read(v2etSessionUnlockedProvider.notifier).state = true;
         if (!context.mounted) {
           return;
         }
-        final plan = subscription.planName ?? tr(zhText: '未知套餐', enText: 'Unknown plan');
-        final nodes = subscription.nodeCount?.toString() ?? tr(zhText: '未知', enText: 'unknown');
+        final plan =
+            subscription.planName ?? tr(zhText: '未知套餐', enText: 'Unknown plan');
+        final nodes =
+            subscription.nodeCount?.toString() ??
+            tr(zhText: '未知', enText: 'unknown');
         notifications.showSuccessToast(
           tr(
             zhText: '登录成功，已自动导入订阅。套餐: $plan，线路: $nodes',
-            enText: 'Login successful. Subscription auto-imported. Plan: $plan, Lines: $nodes',
+            enText:
+                'Login successful. Subscription auto-imported. Plan: $plan, Lines: $nodes',
           ),
         );
         Navigator.of(context).pop();
@@ -111,17 +129,25 @@ class V2etQuickImportDialog extends HookConsumerWidget {
                 final raw = value?.trim() ?? '';
                 final uri = Uri.tryParse(raw);
                 if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
-                  return tr(zhText: '请输入有效地址', enText: 'Please enter a valid URL.');
+                  return tr(
+                    zhText: '请输入有效地址',
+                    enText: 'Please enter a valid URL.',
+                  );
                 }
                 return null;
               },
             ),
             TextFormField(
               controller: emailController,
-              decoration: InputDecoration(labelText: tr(zhText: '邮箱', enText: 'Email')),
+              decoration: InputDecoration(
+                labelText: tr(zhText: '邮箱', enText: 'Email'),
+              ),
               validator: (value) {
                 if ((value?.trim().isEmpty ?? true)) {
-                  return tr(zhText: '请输入邮箱', enText: 'Please enter your email.');
+                  return tr(
+                    zhText: '请输入邮箱',
+                    enText: 'Please enter your email.',
+                  );
                 }
                 return null;
               },
@@ -129,10 +155,15 @@ class V2etQuickImportDialog extends HookConsumerWidget {
             TextFormField(
               controller: passwordController,
               obscureText: true,
-              decoration: InputDecoration(labelText: tr(zhText: '密码', enText: 'Password')),
+              decoration: InputDecoration(
+                labelText: tr(zhText: '密码', enText: 'Password'),
+              ),
               validator: (value) {
                 if ((value?.isEmpty ?? true)) {
-                  return tr(zhText: '请输入密码', enText: 'Please enter your password.');
+                  return tr(
+                    zhText: '请输入密码',
+                    enText: 'Please enter your password.',
+                  );
                 }
                 return null;
               },
@@ -141,10 +172,17 @@ class V2etQuickImportDialog extends HookConsumerWidget {
         ),
       ),
       actions: [
-        TextButton(onPressed: loading.value ? null : () => Navigator.of(context).pop(), child: Text(t.common.cancel)),
+        TextButton(
+          onPressed: loading.value ? null : () => Navigator.of(context).pop(),
+          child: Text(t.common.cancel),
+        ),
         FilledButton(
           onPressed: loading.value ? null : submit,
-          child: Text(loading.value ? tr(zhText: '登录中...', enText: 'Logging in...') : tr(zhText: '登录并同步', enText: 'Login & Sync')),
+          child: Text(
+            loading.value
+                ? tr(zhText: '登录中...', enText: 'Logging in...')
+                : tr(zhText: '登录并同步', enText: 'Login & Sync'),
+          ),
         ),
       ],
     );
@@ -153,33 +191,45 @@ class V2etQuickImportDialog extends HookConsumerWidget {
   String _mapErrorMessage(Object error, bool zh) {
     final msg = error.toString();
     if (error is StateError && msg.contains('subscribe url not found')) {
-      return zh ? '登录成功，但未找到订阅地址（面板返回异常）。' : 'Login succeeded, but subscribe URL is missing.';
+      return zh
+          ? '登录成功，但未找到订阅地址（面板返回异常）。'
+          : 'Login succeeded, but subscribe URL is missing.';
     }
 
-    if (error is StateError && msg.contains('subscription with available auth headers')) {
-      return zh ? '鉴权不兼容：该面板订阅接口认证方式不匹配。' : 'Auth mismatch: subscribe endpoint auth style is not compatible.';
+    if (error is StateError &&
+        msg.contains('subscription with available auth headers')) {
+      return zh
+          ? '鉴权不兼容：该面板订阅接口认证方式不匹配。'
+          : 'Auth mismatch: subscribe endpoint auth style is not compatible.';
     }
 
     if (error is DioException) {
       final status = error.response?.statusCode;
       final responseMsg = _extractServerMessage(error.response?.data);
-      if ((status == 401 || status == 403) || (responseMsg?.contains('未登录') ?? false)) {
+      if ((status == 401 || status == 403) ||
+          (responseMsg?.contains('未登录') ?? false)) {
         return zh ? '账号或密码错误，或登录已过期。' : 'Wrong credentials or session expired.';
       }
       if (status == 404) {
-        return zh ? '接口不存在，请检查面板地址。' : 'Endpoint not found. Please verify panel URL.';
+        return zh
+            ? '接口不存在，请检查面板地址。'
+            : 'Endpoint not found. Please verify panel URL.';
       }
       if (error.type == DioExceptionType.connectionTimeout ||
           error.type == DioExceptionType.receiveTimeout ||
           error.type == DioExceptionType.connectionError) {
-        return zh ? '网络连接失败，请稍后重试。' : 'Network connection failed. Please retry.';
+        return zh
+            ? '网络连接失败，请稍后重试。'
+            : 'Network connection failed. Please retry.';
       }
       if (responseMsg != null && responseMsg.isNotEmpty) {
         return responseMsg;
       }
     }
 
-    return zh ? '同步失败，请检查面板地址与账号信息。' : 'Sync failed. Please check panel URL and credentials.';
+    return zh
+        ? '同步失败，请检查面板地址与账号信息。'
+        : 'Sync failed. Please check panel URL and credentials.';
   }
 
   String? _extractServerMessage(Object? data) {
@@ -197,7 +247,9 @@ class V2etQuickImportDialog extends HookConsumerWidget {
       }
     }
     if (data is Map) {
-      return _extractServerMessage(data.map((k, v) => MapEntry(k.toString(), v)));
+      return _extractServerMessage(
+        data.map((k, v) => MapEntry(k.toString(), v)),
+      );
     }
     return null;
   }
@@ -238,9 +290,13 @@ class _SubscriptionSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(tr(zhText: '当前套餐信息', enText: 'Current Subscription'), style: theme.textTheme.titleSmall),
+          Text(
+            tr(zhText: '当前套餐信息', enText: 'Current Subscription'),
+            style: theme.textTheme.titleSmall,
+          ),
           const SizedBox(height: 6),
-          for (final line in lines) Text(line, style: theme.textTheme.bodySmall),
+          for (final line in lines)
+            Text(line, style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -257,7 +313,9 @@ class _SubscriptionSummaryCard extends StatelessWidget {
       value /= 1024;
       idx++;
     }
-    final fixed = value >= 100 ? value.toStringAsFixed(0) : value.toStringAsFixed(2);
+    final fixed = value >= 100
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(2);
     return '$fixed ${units[idx]}';
   }
 

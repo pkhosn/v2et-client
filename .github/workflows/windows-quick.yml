@@ -12,6 +12,11 @@ concurrency:
   group: windows-quick-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FLUTTER_VERSION: '3.38.5'
+  IS_GITHUB_ACTIONS: 1
+  CHANNEL: dev
+
 jobs:
   build-windows-portable:
     runs-on: windows-latest
@@ -24,9 +29,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2.21.0
         with:
-          flutter-version: 3.38.5
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Download Windows core libs
+        shell: bash
+        run: make windows-libs
 
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
@@ -35,7 +44,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows release
-        run: flutter build windows --release
+        run: flutter build windows --release --target=lib/main.dart
 
       - name: Pack portable zip
         shell: pwsh

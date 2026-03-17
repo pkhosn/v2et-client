@@ -36,6 +36,7 @@ jobs:
       - name: Prepare dependencies
         shell: bash
         run: |
+          choco install innosetup -y
           make windows-install-deps
           make windows-prepare
 
@@ -49,9 +50,15 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path out -Force | Out-Null
+          Get-ChildItem -Path dist -Recurse | Select-Object FullName
           $exe = Get-ChildItem -Path dist -Recurse -Filter "*.exe" | Select-Object -First 1
-          if (-not $exe) { throw "No .exe installer found in dist directory" }
-          Copy-Item $exe.FullName "out/v2et-windows-setup.exe" -Force
+          if (-not $exe) {
+            $runnerExe = Get-ChildItem -Path "build/windows/x64/runner/Release" -Filter "*.exe" | Select-Object -First 1
+            if (-not $runnerExe) { throw "No .exe found in dist or build output" }
+            Copy-Item $runnerExe.FullName "out/v2et-windows-runner.exe" -Force
+          } else {
+            Copy-Item $exe.FullName "out/v2et-windows-setup.exe" -Force
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

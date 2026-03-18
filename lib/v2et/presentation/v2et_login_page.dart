@@ -22,6 +22,8 @@ class V2etLoginPage extends HookConsumerWidget {
       context,
     ).languageCode.toLowerCase().startsWith('zh');
     String tr(String a, String b) => zh ? a : b;
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 900;
 
     final savedCredentialsFuture = useMemoized(
       () => ref.read(v2etRepositoryProvider).readSavedCredentials(),
@@ -29,11 +31,8 @@ class V2etLoginPage extends HookConsumerWidget {
     final savedCredentials = useFuture(savedCredentialsFuture).data;
 
     final formKey = useMemoized(GlobalKey<FormState>.new);
-    final baseUrlController = useTextEditingController(
-      text:
-          savedCredentials?.baseUrl.toString() ??
-          V2etBootstrapConfig.defaultConfigUrl,
-    );
+    final panelConfigUrl =
+        savedCredentials?.baseUrl.toString() ?? V2etBootstrapConfig.defaultConfigUrl;
     final emailController = useTextEditingController(
       text: savedCredentials?.email ?? '',
     );
@@ -41,11 +40,13 @@ class V2etLoginPage extends HookConsumerWidget {
       text: savedCredentials?.password ?? '',
     );
     final loading = useState(false);
-    final showAdvanced = useState(false);
+    final rememberPassword = useState(true);
+    final autoLogin = useState(true);
+    final obscurePassword = useState(true);
     final locale = ref.watch(localePreferencesProvider);
 
     Future<Uri> resolvePanelBase() async {
-      final input = Uri.parse(baseUrlController.text.trim());
+      final input = Uri.parse(panelConfigUrl.trim());
       return ref.read(v2etEndpointResolverProvider).resolveBaseUrl(input);
     }
 
@@ -89,7 +90,7 @@ class V2etLoginPage extends HookConsumerWidget {
       try {
         final resolvedBase = await ref
             .read(v2etEndpointResolverProvider)
-            .resolveBaseUrl(Uri.parse(baseUrlController.text.trim()));
+            .resolveBaseUrl(Uri.parse(panelConfigUrl.trim()));
         final credentials = V2boardCredentials(
           baseUrl: resolvedBase,
           email: emailController.text.trim(),
@@ -118,56 +119,28 @@ class V2etLoginPage extends HookConsumerWidget {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F2F8),
       body: Row(
         children: [
-          Expanded(
-            flex: 5,
-            child: Container(
-              color: const Color(0xFF2C1E4D),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.shield_outlined,
-                      color: Colors.white,
-                      size: 74,
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'V2ET',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 44,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      tr('世界触手可得', 'Reach the world'),
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ],
+          if (!compact)
+            Expanded(
+              flex: 5,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF211338), Color(0xFF3D2860)],
+                  ),
                 ),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 7,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: PopupMenuButton<AppLocale>(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          PopupMenuButton<AppLocale>(
                             initialValue: locale,
                             onSelected: (value) async {
                               await ref
@@ -183,125 +156,231 @@ class V2etLoginPage extends HookConsumerWidget {
                                 )
                                 .toList(),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
+                                color: const Color(0xFF2E2250),
                                 borderRadius: BorderRadius.circular(12),
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.language_rounded, size: 18),
+                                  const Icon(Icons.translate_rounded, color: Colors.white, size: 18),
                                   const SizedBox(width: 6),
-                                  Text(locale.localeName),
+                                  Text(
+                                    locale.localeName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E2250),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.public_rounded, color: Colors.white, size: 20),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 190,
+                              height: 190,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF6E6294).withOpacity(0.35), width: 2),
+                              ),
+                              child: const Icon(Icons.shield_rounded, color: Color(0xFFF4F0FB), size: 74),
+                            ),
+                            const SizedBox(height: 30),
+                            const Text(
+                              'Pltea',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 72,
+                                letterSpacing: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              tr('世界触手可得', 'Reach the world'),
+                              style: const TextStyle(color: Color(0xFFD2CCE3), fontSize: 22),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 10),
+                      ),
+                      const Spacer(),
+                      const Text(
+                        '© 2026 Pltea. All rights reserved.',
+                        style: TextStyle(color: Color(0xFFC5BED7), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            flex: compact ? 1 : 7,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(compact ? 28 : 70, 24, compact ? 28 : 84, 24),
+                  child: SingleChildScrollView(
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (compact)
+                              PopupMenuButton<AppLocale>(
+                                initialValue: locale,
+                                onSelected: (value) async {
+                                  await ref
+                                      .read(localePreferencesProvider.notifier)
+                                      .changeLocale(value);
+                                },
+                                itemBuilder: (_) => AppLocale.values
+                                    .map(
+                                      (e) => PopupMenuItem<AppLocale>(
+                                        value: e,
+                                        child: Text(e.localeName),
+                                      ),
+                                    )
+                                    .toList(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: const Color(0xFFEDE7F4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.translate_rounded, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(locale.localeName),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            const Spacer(),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.public_rounded, size: 24)),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
                         Text(
                           tr('登录', 'Login'),
                           style: const TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 48,
+                            color: Color(0xFF4C347C),
+                            fontWeight: FontWeight.w800,
+                            height: 1,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(tr('欢迎回来，请登录您的账号', 'Welcome back, please login')),
-                        const SizedBox(height: 24),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: () =>
-                                showAdvanced.value = !showAdvanced.value,
-                            icon: Icon(
-                              showAdvanced.value
-                                  ? Icons.expand_less_rounded
-                                  : Icons.tune_rounded,
-                            ),
-                            label: Text(
-                              tr('高级网络设置', 'Advanced Network Settings'),
-                            ),
-                          ),
-                        ),
-                        if (showAdvanced.value) ...[
-                          TextFormField(
-                            controller: baseUrlController,
-                            decoration: InputDecoration(
-                              labelText: tr('配置地址（OSS）', 'Config URL (OSS)'),
-                            ),
-                            validator: (value) {
-                              final uri = Uri.tryParse(value?.trim() ?? '');
-                              if (uri == null ||
-                                  !uri.hasScheme ||
-                                  !uri.hasAuthority) {
-                                return tr(
-                                  '请输入有效配置地址',
-                                  'Enter valid config URL',
-                                );
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        TextFormField(
-                          controller: emailController,
-                          decoration: InputDecoration(
-                            labelText: tr('邮箱', 'Email'),
-                          ),
-                          validator: (value) => (value?.trim().isEmpty ?? true)
-                              ? tr('请输入邮箱', 'Enter email')
-                              : null,
                         ),
                         const SizedBox(height: 12),
-                        TextFormField(
-                          controller: passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: tr('密码', 'Password'),
-                          ),
-                          validator: (value) => (value?.isEmpty ?? true)
-                              ? tr('请输入密码', 'Enter password')
-                              : null,
+                        Text(
+                          tr('欢迎回来，请登录您的账号', 'Welcome back, please login'),
+                          style: const TextStyle(color: Color(0xFF5F5A67), fontSize: 16),
                         ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: loading.value ? null : submit,
-                            child: Text(
-                              loading.value
-                                  ? tr('登录中...', 'Logging in...')
-                                  : tr('登录', 'Login'),
+                        const SizedBox(height: 56),
+                        _V2etInputField(
+                          label: tr('邮箱', 'Email'),
+                          hint: tr('请输入邮箱', 'Enter email'),
+                          icon: Icons.mail_outline_rounded,
+                          controller: emailController,
+                          validator: (value) => (value?.trim().isEmpty ?? true) ? tr('请输入邮箱', 'Enter email') : null,
+                        ),
+                        const SizedBox(height: 16),
+                        _V2etInputField(
+                          label: tr('密码', 'Password'),
+                          hint: tr('请输入密码', 'Enter password'),
+                          icon: Icons.lock_outline_rounded,
+                          controller: passwordController,
+                          obscureText: obscurePassword.value,
+                          trailing: IconButton(
+                            onPressed: () => obscurePassword.value = !obscurePassword.value,
+                            icon: Icon(
+                              obscurePassword.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: const Color(0xFF5C5966),
                             ),
                           ),
+                          validator: (value) => (value?.isEmpty ?? true) ? tr('请输入密码', 'Enter password') : null,
                         ),
                         const SizedBox(height: 14),
                         Row(
                           children: [
+                            _LabeledCheckbox(
+                              label: tr('记住密码', 'Remember password'),
+                              value: rememberPassword.value,
+                              onChanged: (v) => rememberPassword.value = v ?? false,
+                            ),
+                            const Spacer(),
+                            _LabeledCheckbox(
+                              label: tr('自动登录', 'Auto Login'),
+                              value: autoLogin.value,
+                              onChanged: (v) => autoLogin.value = v ?? false,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF573C87),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(56),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: loading.value ? null : submit,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  loading.value ? tr('登录中...', 'Logging in...') : tr('登录', 'Login'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.login_rounded, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
                             TextButton.icon(
                               onPressed: loading.value ? null : openRegister,
-                              icon: const Icon(Icons.person_add_alt_1_rounded),
+                              icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
                               label: Text(tr('注册', 'Register')),
                             ),
                             const Spacer(),
                             TextButton.icon(
-                              onPressed: loading.value
-                                  ? null
-                                  : openForgotPassword,
-                              icon: const Icon(Icons.help_outline_rounded),
+                              onPressed: loading.value ? null : openForgotPassword,
+                              icon: const Icon(Icons.help_outline_rounded, size: 18),
                               label: Text(tr('忘记密码？', 'Forgot Password?')),
                             ),
                           ],
                         ),
                       ],
+                    ),
+                  ),
                     ),
                   ),
                 ),
@@ -310,6 +389,86 @@ class V2etLoginPage extends HookConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _V2etInputField extends StatelessWidget {
+  const _V2etInputField({
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.controller,
+    required this.validator,
+    this.obscureText = false,
+    this.trailing,
+  });
+
+  final String label;
+  final String hint;
+  final IconData icon;
+  final TextEditingController controller;
+  final String? Function(String?) validator;
+  final bool obscureText;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 16, color: Color(0xFF2D2A36))),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          obscureText: obscureText,
+          style: const TextStyle(fontSize: 16),
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, color: const Color(0xFF5C5966)),
+            suffixIcon: trailing,
+            filled: true,
+            fillColor: const Color(0xFFF4F1F8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF94909E), width: 1.3),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF94909E), width: 1.3),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF573C87), width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LabeledCheckbox extends StatelessWidget {
+  const _LabeledCheckbox({required this.label, required this.value, required this.onChanged});
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Checkbox(
+          value: value,
+          onChanged: onChanged,
+          activeColor: const Color(0xFF573C87),
+          side: const BorderSide(color: Color(0xFF6D6878)),
+          visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+        ),
+        Text(label, style: const TextStyle(fontSize: 15, color: Color(0xFF2D2A36))),
+      ],
     );
   }
 }

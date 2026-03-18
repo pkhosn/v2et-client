@@ -55,6 +55,35 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         HardwareKeyboard.instance.removeHandler(handler);
       };
     }, [isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex]);
+    if (v2etMode) {
+      final actions = _actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode);
+      return Material(
+        color: const Color(0xFFF5F2F8),
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF5F2F8),
+          body: isMobileBreakpoint
+              ? navigationShell
+              : Row(
+                  children: [
+                    _V2etDesktopSidebar(
+                      actions: actions,
+                      selectedIndex: navigationShell.currentIndex,
+                      onTap: (index) => _onTap(context, index),
+                    ),
+                    Expanded(child: navigationShell),
+                  ],
+                ),
+          bottomNavigationBar: isMobileBreakpoint
+              ? _V2etBottomBar(
+                  actions: actions,
+                  selectedIndex: navigationShell.currentIndex,
+                  onTap: (index) => _onTap(context, index),
+                )
+              : null,
+        ),
+      );
+    }
+
     return Material(
       child: Scaffold(
         body: isMobileBreakpoint
@@ -138,4 +167,183 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();
   List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) =>
       actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
+}
+
+class _V2etDesktopSidebar extends StatelessWidget {
+  const _V2etDesktopSidebar({
+    required this.actions,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<ShellRouteAction> actions;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 104,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF0ECF4),
+        border: Border(right: BorderSide(color: Color(0xFFE4DFEB))),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 16),
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E2F1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'K',
+                style: TextStyle(
+                  color: Color(0xFF4E5DCC),
+                  fontWeight: FontWeight.w800,
+                  fontStyle: FontStyle.italic,
+                  fontSize: 30,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          for (var i = 0; i < actions.length; i++)
+            _V2etNavItem(
+              icon: actions[i].icon,
+              label: actions[i].title,
+              selected: selectedIndex == i,
+              onTap: () => onTap(i),
+            ),
+          const Spacer(),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.menu_rounded, color: Color(0xFF6D6977), size: 24),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class _V2etNavItem extends StatelessWidget {
+  const _V2etNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: SizedBox(
+          width: 84,
+          child: Column(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFFE8DBFF) : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: selected ? const Color(0xFF4D367A) : const Color(0xFF5A5663),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: const Color(0xFF2A2434),
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _V2etBottomBar extends StatelessWidget {
+  const _V2etBottomBar({
+    required this.actions,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<ShellRouteAction> actions;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF0ECF4),
+        border: Border(top: BorderSide(color: Color(0xFFE4DFEB))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 72,
+          child: Row(
+            children: [
+              for (var i = 0; i < actions.length; i++)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onTap(i),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: selectedIndex == i ? const Color(0xFFE8DBFF) : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            actions[i].icon,
+                            size: 18,
+                            color: selectedIndex == i ? const Color(0xFF4D367A) : const Color(0xFF5A5663),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          actions[i].title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: const Color(0xFF2A2434),
+                            fontWeight: selectedIndex == i ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

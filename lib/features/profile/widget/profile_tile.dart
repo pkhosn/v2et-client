@@ -2,6 +2,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -21,6 +22,38 @@ import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:url_launcher/url_launcher.dart';
+
+Uri? _parseExternalUri(String? url) {
+  if (url == null || url.trim().isEmpty) return null;
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null || uri.host.isEmpty) return null;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+  return uri;
+}
+
+IconData _linkIcon(Uri uri, IconData fallback) {
+  final host = uri.host.toLowerCase();
+  if (host.endsWith('telegram.me') || host.endsWith('t.me')) return FontAwesomeIcons.telegram;
+  if (host.endsWith('instagram.com')) return FontAwesomeIcons.instagram;
+  if (host.endsWith('twitter.com') || host.endsWith('x.com')) return FontAwesomeIcons.xTwitter;
+  if (host.endsWith('facebook.com')) return FontAwesomeIcons.facebook;
+  return fallback;
+}
+
+String _formatLinkLabel(Uri uri) {
+  final host = uri.host.toLowerCase();
+  if ((host.endsWith('telegram.me') || host.endsWith('t.me')) && uri.pathSegments.isNotEmpty) {
+    return '@${uri.pathSegments.last}';
+  }
+  if ((host.endsWith('instagram.com') || host.endsWith('twitter.com') || host.endsWith('x.com')) &&
+      uri.pathSegments.isNotEmpty) {
+    return '@${uri.pathSegments.first}';
+  }
+  if (host.endsWith('facebook.com')) {
+    return uri.pathSegments.lastWhere((segment) => segment.isNotEmpty, orElse: () => uri.host);
+  }
+  return uri.host;
+}
 
 class ProfileTile extends HookConsumerWidget {
   const ProfileTile({super.key, required this.profile, this.isMain = false, this.margin = EdgeInsets.zero, this.color});
@@ -313,7 +346,6 @@ class ProfileActionsMenu extends HookConsumerWidget {
   }
 }
 
-// TODO add support url
 class ProfileSubscriptionInfo extends HookConsumerWidget {
   const ProfileSubscriptionInfo(this.subInfo, {super.key});
 
@@ -337,40 +369,45 @@ class ProfileSubscriptionInfo extends HookConsumerWidget {
     final theme = Theme.of(context);
 
     final remaining = remainingText(t, theme);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Flexible(
-            child: Text(
-              subInfo.total >
-                      10 *
-                          1099511627776 //10TB
-                  ? "∞ GiB"
-                  : subInfo.consumption.sizeOf(subInfo.total),
-              semanticsLabel: t.components.subscriptionInfo.remainingTrafficSemanticLabel(
-                consumed: subInfo.consumption.sizeGB(),
-                total: subInfo.total.sizeGB(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Flexible(
+                child: Text(
+                  subInfo.total >
+                          10 *
+                              1099511627776 //10TB
+                      ? "∞ GiB"
+                      : subInfo.consumption.sizeOf(subInfo.total),
+                  semanticsLabel: t.components.subscriptionInfo.remainingTrafficSemanticLabel(
+                    consumed: subInfo.consumption.sizeGB(),
+                    total: subInfo.total.sizeGB(),
+                  ),
+                  style: theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              style: theme.textTheme.bodySmall,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
+            Flexible(
+              child: Text(
+                remaining.$1,
+                style: theme.textTheme.bodySmall?.copyWith(color: remaining.$2),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
-        Flexible(
-          child: Text(
-            remaining.$1,
-            style: theme.textTheme.bodySmall?.copyWith(color: remaining.$2),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
+        SubscriptionLinksRow(subInfo: subInfo),
       ],
     );
   }
 }
 
-// TODO add support url
 class NewTrafficSubscriptionInfo extends HookConsumerWidget {
   const NewTrafficSubscriptionInfo(this.subInfo, {super.key});
 
@@ -407,12 +444,12 @@ class NewTrafficSubscriptionInfo extends HookConsumerWidget {
             ),
           ],
         ),
+        SubscriptionLinksRow(subInfo: subInfo),
       ],
     );
   }
 }
 
-// TODO add support url
 class NewDaySubscriptionInfo extends HookConsumerWidget {
   const NewDaySubscriptionInfo(this.subInfo, {super.key});
 
@@ -454,12 +491,12 @@ class NewDaySubscriptionInfo extends HookConsumerWidget {
             ),
           ],
         ),
+        SubscriptionLinksRow(subInfo: subInfo),
       ],
     );
   }
 }
 
-// TODO add support url
 class NewDayTrafficSubscriptionInfo extends HookConsumerWidget {
   const NewDayTrafficSubscriptionInfo(this.subInfo, {super.key});
 
@@ -510,7 +547,51 @@ class NewDayTrafficSubscriptionInfo extends HookConsumerWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
+        SubscriptionLinksRow(subInfo: subInfo),
       ],
+    );
+  }
+}
+
+class SubscriptionLinksRow extends HookConsumerWidget {
+  const SubscriptionLinksRow({super.key, required this.subInfo});
+
+  final SubscriptionInfo subInfo;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = ref.watch(translationsProvider).requireValue;
+    final links = [
+      (
+        title: t.components.subscriptionInfo.profileSite,
+        icon: FluentIcons.building_shop_24_regular,
+        uri: _parseExternalUri(subInfo.webPageUrl),
+      ),
+      (
+        title: t.components.subscriptionInfo.profileSupport,
+        icon: FontAwesomeIcons.headset,
+        uri: _parseExternalUri(subInfo.supportUrl),
+      ),
+    ].where((item) => item.uri != null).toList();
+
+    if (links.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: links.map((item) {
+          final uri = item.uri!;
+          return ActionChip(
+            avatar: Icon(_linkIcon(uri, item.icon), size: 16),
+            label: Text('${item.title}: ${_formatLinkLabel(uri)}', overflow: TextOverflow.ellipsis),
+            onPressed: () async {
+              await launchUrl(uri);
+            },
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -554,43 +635,29 @@ class NewSiteSubscriptionInfo extends HookConsumerWidget {
   }
 }
 
-// TODO change colors
 class RemainingTrafficIndicator extends StatelessWidget {
   const RemainingTrafficIndicator(this.ratio, {super.key});
 
   final double ratio;
 
+  Color _progressColor(ColorScheme colorScheme) {
+    if (ratio >= 0.9) return colorScheme.error;
+    if (ratio >= 0.7) return colorScheme.errorContainer;
+    if (ratio >= 0.45) return colorScheme.tertiary;
+    return colorScheme.primary;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // final startColor = ratio < 0.25
-    //     ? const Color.fromRGBO(93, 205, 251, 1.0)
-    //     : ratio < 0.65
-    //         ? const Color.fromRGBO(205, 199, 64, 1.0)
-    //         : const Color.fromRGBO(241, 82, 81, 1.0);
-    // final endColor = ratio < 0.25
-    //     ? const Color.fromRGBO(49, 146, 248, 1.0)
-    //     : ratio < 0.65
-    //         ? const Color.fromRGBO(98, 115, 32, 1.0)
-    //         : const Color.fromRGBO(139, 30, 36, 1.0);
-    return LinearProgressIndicator(value: ratio, borderRadius: BorderRadius.circular(16), minHeight: 6);
-    // return HorizontalPercentIndicator(
-    //   height: 6,
+    final colorScheme = Theme.of(context).colorScheme;
+    final clampedRatio = ratio.clamp(0.0, 1.0);
 
-    //   borderRadius: 16,
-    //   loadingPercent: ratio,
-    //   // inactiveTrackColor: Color.fromRGBO(r, g, b, opacity),
-
-    //   activeTrackColor: [startColor, endColor],
-    // );
-    // return LinearPercentIndicator(
-    //     // percent: ratio,
-    //     // animation: false,
-    //     // padding: EdgeInsets.zero,
-    //     // lineHeight: 6,
-    //     // barRadius: const Radius.circular(16),
-    //     // linearGradient: LinearGradient(
-    //     //   colors: [startColor, endColor],
-    //     // ),
-    //     );
+    return LinearProgressIndicator(
+      value: clampedRatio,
+      minHeight: 6,
+      borderRadius: BorderRadius.circular(16),
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      color: _progressColor(colorScheme),
+    );
   }
 }

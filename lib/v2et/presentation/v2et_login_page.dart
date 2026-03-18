@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -25,7 +27,7 @@ class V2etLoginPage extends HookConsumerWidget {
     String tr(String a, String b) => zh ? a : b;
 
     final width = MediaQuery.sizeOf(context).width;
-    final compact = !PlatformUtils.isDesktop && width < 900;
+    final compact = PlatformUtils.isDesktop ? false : width < 900;
 
     final savedCredentialsFuture = useMemoized(() => ref.read(v2etRepositoryProvider).readSavedCredentials());
     final savedCredentials = useFuture(savedCredentialsFuture).data;
@@ -59,8 +61,14 @@ class V2etLoginPage extends HookConsumerWidget {
 
         await ref.read(Preferences.enableV2etAdapter.notifier).update(true);
         final sub = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
-        await ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString());
         ref.read(v2etSessionUnlockedProvider.notifier).state = true;
+        unawaited(
+          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((error) {
+            ref
+                .read(inAppNotificationControllerProvider)
+                .showErrorToast(tr('订阅导入失败: ', 'Subscription import failed: ') + error.toString());
+          }),
+        );
         if (!context.mounted) return;
         ref.read(inAppNotificationControllerProvider).showSuccessToast(tr('登录成功，正在进入客户端', 'Login success'));
         context.go('/home');

@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -27,7 +27,6 @@ class V2etDashboardPage extends HookConsumerWidget {
     final compact = MediaQuery.sizeOf(context).width < 900;
     String tr(String a, String b) => zh ? a : b;
 
-    final appInfo = ref.watch(appInfoProvider).valueOrNull;
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
     final savedCredentialsFuture = useMemoized(
       () => ref.read(v2etRepositoryProvider).readSavedCredentials(),
@@ -39,6 +38,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final session = ref.watch(v2etSessionProvider).valueOrNull;
     final notices = ref.watch(v2etNoticesProvider).valueOrNull ?? const [];
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+    final proxyGroup = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
     final selectedNode = useState<String?>(null);
     final noticeShown = useState(false);
 
@@ -51,6 +51,50 @@ class V2etDashboardPage extends HookConsumerWidget {
       AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
       _ => false,
     };
+    final isConnected = connection.valueOrNull == const Connected();
+
+    void showNoticesDialog() {
+      if (!context.mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(zh ? '系统公告' : 'Notice'),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: notices.isEmpty
+                    ? [Text(zh ? '暂无公告' : 'No notice')]
+                    : notices
+                        .take(5)
+                        .map(
+                          (n) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text(n.content),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(zh ? '我知道了' : 'OK'),
+            ),
+          ],
+        ),
+      );
+    }
 
     useEffect(() {
       final popupEnabled = runtimeConfig?.enableNoticePopup ?? true;
@@ -58,46 +102,7 @@ class V2etDashboardPage extends HookConsumerWidget {
         return null;
       }
       noticeShown.value = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!context.mounted) return;
-        showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text(zh ? '系统公告' : 'Notice'),
-            content: SizedBox(
-              width: 460,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: notices
-                      .take(3)
-                      .map(
-                        (n) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 4),
-                              Text(n.content),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(zh ? '我知道了' : 'OK'),
-              ),
-            ],
-          ),
-        );
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => showNoticesDialog());
       return null;
     }, [runtimeConfig?.enableNoticePopup, notices.length, session?.accessToken]);
 
@@ -124,24 +129,6 @@ class V2etDashboardPage extends HookConsumerWidget {
         child: ListView(
           padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, compact ? 12 : 20),
           children: [
-            Row(
-              children: [
-                const Icon(Icons.public_rounded, size: 17, color: Color(0xFF4C3A7A)),
-                const SizedBox(width: 10),
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(color: Color(0xFF5A3D89), shape: BoxShape.circle),
-                  child: const Icon(Icons.check, color: Colors.white, size: 16),
-                ),
-                const SizedBox(width: 8),
-                Text('V${appInfo?.version ?? '--'}', style: const TextStyle(fontSize: 18, color: Color(0xFF2D2737))),
-                const Spacer(),
-                IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF2D2737))),
-                IconButton(onPressed: () {}, icon: const Icon(Icons.menu_rounded, color: Color(0xFF2D2737))),
-              ],
-            ),
-            const SizedBox(height: 10),
             _Card(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,6 +247,7 @@ class V2etDashboardPage extends HookConsumerWidget {
             Center(
               child: _PowerButton(
                 enabled: canToggle,
+                active: isConnected,
                 onTap: () async => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
               ),
             ),
@@ -286,39 +274,61 @@ class V2etDashboardPage extends HookConsumerWidget {
                   backgroundColor: const Color(0xFFF5F2F8),
                   isScrollControlled: true,
                   builder: (ctx) {
-                    return SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tr('选择节点', 'Select Node'),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                    return Consumer(
+                      builder: (context, sheetRef, _) {
+                        final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
+                        final entries = _buildNodeEntries(tags, group);
+                        return SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      tr('选择节点', 'Select Node'),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                                    ),
+                                    const Spacer(),
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await sheetRef.read(proxiesOverviewNotifierProvider.notifier).urlTest('select');
+                                      },
+                                      icon: const Icon(Icons.speed_rounded, size: 16),
+                                      label: Text(tr('测试延迟', 'Latency test')),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                SizedBox(
+                                  height: MediaQuery.of(ctx).size.height * 0.6,
+                                  child: ListView.separated(
+                                    itemCount: entries.length,
+                                    separatorBuilder: (_, _) => const Divider(height: 1),
+                                    itemBuilder: (_, i) {
+                                      final item = entries[i];
+                                      return ListTile(
+                                        dense: true,
+                                        leading: Text(item.flag, style: const TextStyle(fontSize: 20)),
+                                        title: Text(item.tag),
+                                        subtitle: Text(
+                                          'PING ${_latencyText(item.pingMs, zh)} | LINK ${_latencyText(item.linkMs, zh)}',
+                                        ),
+                                        trailing: selectedNode.value == item.tag
+                                            ? const Icon(Icons.check_rounded, color: Color(0xFF5A3D89))
+                                            : null,
+                                        onTap: () => Navigator.of(ctx).pop(item.tag),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              height: MediaQuery.of(ctx).size.height * 0.6,
-                              child: ListView.separated(
-                                itemCount: tags.length,
-                                separatorBuilder: (_, _) => const Divider(height: 1),
-                                itemBuilder: (_, i) {
-                                  final tag = tags[i];
-                                  return ListTile(
-                                    dense: true,
-                                    title: Text(tag),
-                                    trailing: selectedNode.value == tag
-                                        ? const Icon(Icons.check_rounded, color: Color(0xFF5A3D89))
-                                        : null,
-                                    onTap: () => Navigator.of(ctx).pop(tag),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -378,15 +388,27 @@ class V2etDashboardPage extends HookConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                onPressed: () => context.go('/settings'),
-                icon: const Icon(Icons.settings_rounded, color: Color(0xFF3E3947)),
-                tooltip: tr('设置', 'Settings'),
+            if (compact) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: showNoticesDialog,
+                      icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF3E3947)),
+                      tooltip: tr('公告', 'Notices'),
+                    ),
+                    IconButton(
+                      onPressed: () => context.go('/settings'),
+                      icon: const Icon(Icons.settings_rounded, color: Color(0xFF3E3947)),
+                      tooltip: tr('设置', 'Settings'),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -451,6 +473,78 @@ class V2etDashboardPage extends HookConsumerWidget {
       return const [];
     }
   }
+
+  List<_NodeEntry> _buildNodeEntries(List<String> tags, dynamic proxyGroup) {
+    final delayMap = <String, int>{};
+    try {
+      final items = proxyGroup?.items as List<dynamic>?;
+      if (items != null) {
+        for (final item in items) {
+          final tag = item.tag?.toString() ?? '';
+          final delay = item.urlTestDelay is int ? item.urlTestDelay as int : 0;
+          if (tag.isNotEmpty) delayMap[tag] = delay;
+        }
+      }
+    } catch (_) {}
+
+    return tags
+        .map((tag) {
+          final delay = delayMap[tag];
+          final d = delay != null && delay > 0 ? delay : null;
+          return _NodeEntry(tag: tag, flag: _flagForTag(tag), pingMs: d, linkMs: d);
+        })
+        .toList();
+  }
+
+  String _latencyText(int? ms, bool zh) {
+    if (ms == null || ms <= 0) return zh ? '超时' : 'timeout';
+    return '${ms}ms';
+  }
+
+  String _flagForTag(String tag) {
+    final t = tag.toLowerCase();
+    final entries = <String, String>{
+      'hong kong': '🇭🇰',
+      'hk': '🇭🇰',
+      'japan': '🇯🇵',
+      'jp': '🇯🇵',
+      'singapore': '🇸🇬',
+      'sg': '🇸🇬',
+      'usa': '🇺🇸',
+      'us': '🇺🇸',
+      'united states': '🇺🇸',
+      'korea': '🇰🇷',
+      'kr': '🇰🇷',
+      'taiwan': '🇹🇼',
+      'tw': '🇹🇼',
+      'germany': '🇩🇪',
+      'de': '🇩🇪',
+      'uk': '🇬🇧',
+      'united kingdom': '🇬🇧',
+      'france': '🇫🇷',
+      'fr': '🇫🇷',
+      'canada': '🇨🇦',
+      'ca': '🇨🇦',
+    };
+    for (final e in entries.entries) {
+      if (t.contains(e.key)) return e.value;
+    }
+    return '🌐';
+  }
+}
+
+class _NodeEntry {
+  const _NodeEntry({
+    required this.tag,
+    required this.flag,
+    required this.pingMs,
+    required this.linkMs,
+  });
+
+  final String tag;
+  final String flag;
+  final int? pingMs;
+  final int? linkMs;
 }
 
 class _Card extends StatelessWidget {
@@ -520,35 +614,83 @@ class _ModePill extends StatelessWidget {
   }
 }
 
-class _PowerButton extends StatelessWidget {
-  const _PowerButton({required this.enabled, required this.onTap});
+class _PowerButton extends HookWidget {
+  const _PowerButton({required this.enabled, required this.active, required this.onTap});
 
   final bool enabled;
+  final bool active;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 160,
-      height: 160,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          colors: [Color(0xFFF9F7FC), Color(0xFFE2DDE9)],
-          radius: 0.78,
-        ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x2A3B2A53), blurRadius: 28, offset: Offset(0, 12)),
+    final controller = useAnimationController(duration: const Duration(milliseconds: 1400));
+    useEffect(() {
+      if (active) {
+        controller.repeat();
+      } else {
+        controller.stop();
+        controller.value = 0;
+      }
+      return null;
+    }, [active]);
+
+    return SizedBox(
+      width: 190,
+      height: 190,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (active)
+            for (final begin in [0.0, 0.5])
+              AnimatedBuilder(
+                animation: controller,
+                builder: (_, __) {
+                  final t = ((controller.value + begin) % 1.0);
+                  return Opacity(
+                    opacity: (1 - t).clamp(0.0, 1.0),
+                    child: Container(
+                      width: 140 + t * 70,
+                      height: 140 + t * 70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0x665A3D89), width: 2),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          Container(
+            width: 160,
+            height: 160,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                colors: [Color(0xFFF9F7FC), Color(0xFFE2DDE9)],
+                radius: 0.78,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: active ? const Color(0x555A3D89) : const Color(0x2A3B2A53),
+                  blurRadius: active ? 40 : 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: enabled ? onTap : null,
+                child: Icon(
+                  Icons.power_settings_new_rounded,
+                  size: 64,
+                  color: active ? const Color(0xFF573C87) : const Color(0xFF5A5562),
+                ),
+              ),
+            ),
+          ),
         ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: enabled ? onTap : null,
-          child: const Icon(Icons.power_settings_new_rounded, size: 64, color: Color(0xFF5A5562)),
-        ),
       ),
     );
   }

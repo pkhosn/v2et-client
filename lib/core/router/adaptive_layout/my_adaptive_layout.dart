@@ -69,6 +69,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       actions: actions,
                       selectedIndex: navigationShell.currentIndex,
                       onTap: (index) => _onTap(context, index),
+                      onSettingsTap: () => context.go('/settings'),
                     ),
                     Expanded(child: navigationShell),
                   ],
@@ -174,11 +175,13 @@ class _V2etDesktopSidebar extends StatelessWidget {
     required this.actions,
     required this.selectedIndex,
     required this.onTap,
+    required this.onSettingsTap,
   });
 
   final List<ShellRouteAction> actions;
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback onSettingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -220,8 +223,8 @@ class _V2etDesktopSidebar extends StatelessWidget {
             ),
           const Spacer(),
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.menu_rounded, color: Color(0xFF6D6977), size: 24),
+            onPressed: onSettingsTap,
+            icon: const Icon(Icons.settings_rounded, color: Color(0xFF6D6977), size: 24),
           ),
           const SizedBox(height: 12),
         ],

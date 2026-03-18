@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
@@ -199,18 +201,58 @@ class V2etPortalApi {
   }
 
   List<String> _extractFeatures(Map<String, dynamic> row) {
-    final candidates = <String?>[
-      _readString(row['content']),
-      _readString(row['description']),
-      _readString(row['remark']),
+    final candidates = <Object?>[
+      row['content'],
+      row['description'],
+      row['remark'],
+      row['features'],
     ];
-    for (final text in candidates) {
-      if (text == null || text.trim().isEmpty) {
+    for (final raw in candidates) {
+      final parsed = _parseFeaturePayload(raw);
+      if (parsed.isEmpty) {
         continue;
       }
+      return parsed;
+    }
+    return const [];
+  }
+
+  List<String> _parseFeaturePayload(Object? raw) {
+    if (raw == null) return const [];
+
+    if (raw is List) {
+      final list = <String>[];
+      for (final item in raw) {
+        if (item is Map) {
+          final map = item.map((k, v) => MapEntry(k.toString(), v));
+          final text = _readString(map['feature']) ?? _readString(map['title']) ?? _readString(map['name']);
+          if (text == null || text.isEmpty) continue;
+          final supported = _readBool(map['support']) ?? _readBool(map['enabled']) ?? true;
+          list.add(supported ? text : '- $text');
+        } else if (item is String && item.trim().isNotEmpty) {
+          list.add(item.trim());
+        }
+      }
+      return list;
+    }
+
+    if (raw is String) {
+      final text = raw.trim();
+      if (text.isEmpty) return const [];
+
+      if (text.startsWith('[') || text.startsWith('{')) {
+        try {
+          final decoded = jsonDecode(text);
+          final parsed = _parseFeaturePayload(decoded);
+          if (parsed.isNotEmpty) return parsed;
+        } catch (_) {}
+      }
+
       final normalized = text
           .replaceAll('<br/>', '\n')
           .replaceAll('<br>', '\n')
+          .replaceAll('</li>', '\n')
+          .replaceAll('<li>', '')
           .replaceAll('</p>', '\n')
           .replaceAll('<p>', '')
           .replaceAll('&nbsp;', ' ');
@@ -219,10 +261,20 @@ class V2etPortalApi {
           .map((e) => e.replaceAll(RegExp('<[^>]*>'), '').trim())
           .where((e) => e.isNotEmpty)
           .toList();
-      if (lines.isNotEmpty) {
-        return lines;
+      return lines;
+    }
+
+    if (raw is Map) {
+      final map = raw.map((k, v) => MapEntry(k.toString(), v));
+      for (final key in const ['feature', 'title', 'name']) {
+        final text = _readString(map[key]);
+        if (text != null && text.isNotEmpty) {
+          final supported = _readBool(map['support']) ?? _readBool(map['enabled']) ?? true;
+          return [supported ? text : '- $text'];
+        }
       }
     }
+
     return const [];
   }
 
@@ -240,5 +292,16 @@ class V2etPortalApi {
       return null;
     }
     return '${speed}Mbps';
+  }
+
+  bool? _readBool(Object? value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final t = value.trim().toLowerCase();
+      if (t == 'true' || t == '1' || t == 'yes' || t == 'on') return true;
+      if (t == 'false' || t == '0' || t == 'no' || t == 'off') return false;
+    }
+    return null;
   }
 }

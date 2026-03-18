@@ -145,13 +145,9 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
           GoRoute(
             name: 'settings',
             path: '/settings',
-            builder: (context, _) => FocusScope(
+            builder: (_, _) => FocusScope(
               node: branchesScope['settings'],
-              child: PopScope(
-                canPop: false,
-                onPopInvokedWithResult: (_, _) => context.goNamed('home'),
-                child: SettingsPage(),
-              ),
+              child: SettingsPage(),
             ),
           ),
         StatefulShellRoute.indexedStack(

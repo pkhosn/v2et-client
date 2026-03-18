@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/core/localization/locale_extensions.dart';
+import 'package:hiddify/core/localization/locale_preferences.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
+import 'package:hiddify/gen/translations.g.dart';
+import 'package:hiddify/utils/uri_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class V2etLoginPage extends HookConsumerWidget {
@@ -38,6 +42,45 @@ class V2etLoginPage extends HookConsumerWidget {
     );
     final loading = useState(false);
     final showAdvanced = useState(false);
+    final locale = ref.watch(localePreferencesProvider);
+
+    Future<Uri> resolvePanelBase() async {
+      final input = Uri.parse(baseUrlController.text.trim());
+      return ref.read(v2etEndpointResolverProvider).resolveBaseUrl(input);
+    }
+
+    Future<void> openRegister() async {
+      try {
+        final base = await resolvePanelBase();
+        final candidates = [
+          base.replace(path: '/#/register'),
+          base.replace(path: '/register'),
+          base.replace(path: '/auth/register'),
+        ];
+        for (final uri in candidates) {
+          if (await UriUtils.tryLaunch(uri)) {
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
+    Future<void> openForgotPassword() async {
+      try {
+        final base = await resolvePanelBase();
+        final candidates = [
+          base.replace(path: '/#/forget'),
+          base.replace(path: '/#/reset'),
+          base.replace(path: '/forget'),
+          base.replace(path: '/password/reset'),
+        ];
+        for (final uri in candidates) {
+          if (await UriUtils.tryLaunch(uri)) {
+            return;
+          }
+        }
+      } catch (_) {}
+    }
 
     Future<void> submit() async {
       if (loading.value) return;
@@ -122,6 +165,46 @@ class V2etLoginPage extends HookConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: PopupMenuButton<AppLocale>(
+                            initialValue: locale,
+                            onSelected: (value) async {
+                              await ref
+                                  .read(localePreferencesProvider.notifier)
+                                  .changeLocale(value);
+                            },
+                            itemBuilder: (_) => AppLocale.values
+                                .map(
+                                  (e) => PopupMenuItem<AppLocale>(
+                                    value: e,
+                                    child: Text(e.localeName),
+                                  ),
+                                )
+                                .toList(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.language_rounded, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(locale.localeName),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                         Text(
                           tr('登录', 'Login'),
                           style: const TextStyle(
@@ -199,6 +282,24 @@ class V2etLoginPage extends HookConsumerWidget {
                                   : tr('登录', 'Login'),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: loading.value ? null : openRegister,
+                              icon: const Icon(Icons.person_add_alt_1_rounded),
+                              label: Text(tr('注册', 'Register')),
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: loading.value
+                                  ? null
+                                  : openForgotPassword,
+                              icon: const Icon(Icons.help_outline_rounded),
+                              label: Text(tr('忘记密码？', 'Forgot Password?')),
+                            ),
+                          ],
                         ),
                       ],
                     ),

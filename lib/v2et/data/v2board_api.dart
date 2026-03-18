@@ -9,6 +9,38 @@ abstract interface class V2boardApi {
   Future<V2boardSession> login(V2boardCredentials credentials);
 
   Future<V2boardSubscription> fetchSubscription(V2boardSession session);
+
+  Future<V2boardAuthConfig> fetchAuthConfig(Uri baseUrl);
+
+  Future<void> sendEmailVerifyCode({
+    required Uri baseUrl,
+    required String email,
+  });
+
+  Future<void> register({
+    required Uri baseUrl,
+    required String email,
+    required String password,
+    String? emailCode,
+    String? inviteCode,
+  });
+
+  Future<void> resetPassword({
+    required Uri baseUrl,
+    required String email,
+    required String password,
+    required String emailCode,
+  });
+}
+
+class V2boardAuthConfig {
+  const V2boardAuthConfig({
+    required this.requireEmailVerify,
+    required this.requireInviteCode,
+  });
+
+  final bool requireEmailVerify;
+  final bool requireInviteCode;
 }
 
 class V2boardApiStub implements V2boardApi {
@@ -19,6 +51,37 @@ class V2boardApiStub implements V2boardApi {
 
   @override
   Future<V2boardSubscription> fetchSubscription(V2boardSession session) {
+    throw UnsupportedError("V2Board API is not implemented yet.");
+  }
+
+  @override
+  Future<V2boardAuthConfig> fetchAuthConfig(Uri baseUrl) {
+    throw UnsupportedError("V2Board API is not implemented yet.");
+  }
+
+  @override
+  Future<void> sendEmailVerifyCode({required Uri baseUrl, required String email}) {
+    throw UnsupportedError("V2Board API is not implemented yet.");
+  }
+
+  @override
+  Future<void> register({
+    required Uri baseUrl,
+    required String email,
+    required String password,
+    String? emailCode,
+    String? inviteCode,
+  }) {
+    throw UnsupportedError("V2Board API is not implemented yet.");
+  }
+
+  @override
+  Future<void> resetPassword({
+    required Uri baseUrl,
+    required String email,
+    required String password,
+    required String emailCode,
+  }) {
     throw UnsupportedError("V2Board API is not implemented yet.");
   }
 }
@@ -73,6 +136,96 @@ class V2boardApiImpl implements V2boardApi {
       transferEnableBytes: _readInt(data?['transfer_enable']),
       expiredAt: _readTimestamp(data?['expired_at']),
       nodeCount: nodeCount,
+    );
+  }
+
+  @override
+  Future<V2boardAuthConfig> fetchAuthConfig(Uri baseUrl) async {
+    final uri = _joinApi(baseUrl, '/api/v1/guest/comm/config');
+    final response = await _dio.getUri<Object?>(
+      uri,
+      options: Options(headers: {'Accept': 'application/json'}),
+    );
+    final json = _readMap(response.data);
+    final data = _readMapNullable(json['data']) ?? json;
+    return V2boardAuthConfig(
+      requireEmailVerify: _readBool(data['is_email_verify']) ?? false,
+      requireInviteCode: _readBool(data['is_invite_force']) ?? false,
+    );
+  }
+
+  @override
+  Future<void> sendEmailVerifyCode({
+    required Uri baseUrl,
+    required String email,
+  }) async {
+    final uri = _joinApi(baseUrl, '/api/v1/passport/comm/sendEmailVerify');
+    await _dio.postUri<Object?>(
+      uri,
+      data: {'email': email},
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      ),
+    );
+  }
+
+  @override
+  Future<void> register({
+    required Uri baseUrl,
+    required String email,
+    required String password,
+    String? emailCode,
+    String? inviteCode,
+  }) async {
+    final uri = _joinApi(baseUrl, '/api/v1/passport/auth/register');
+    final payload = <String, Object>{
+      'email': email,
+      'password': password,
+      'password_confirmation': password,
+    };
+    if (emailCode != null && emailCode.trim().isNotEmpty) {
+      payload['email_code'] = emailCode.trim();
+    }
+    if (inviteCode != null && inviteCode.trim().isNotEmpty) {
+      payload['invite_code'] = inviteCode.trim();
+    }
+    await _dio.postUri<Object?>(
+      uri,
+      data: payload,
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      ),
+    );
+  }
+
+  @override
+  Future<void> resetPassword({
+    required Uri baseUrl,
+    required String email,
+    required String password,
+    required String emailCode,
+  }) async {
+    final uri = _joinApi(baseUrl, '/api/v1/passport/auth/forget');
+    await _dio.postUri<Object?>(
+      uri,
+      data: {
+        'email': email,
+        'email_code': emailCode,
+        'password': password,
+        'password_confirmation': password,
+      },
+      options: Options(
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      ),
     );
   }
 
@@ -196,6 +349,17 @@ class V2boardApiImpl implements V2boardApi {
       return null;
     }
     return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
+  }
+
+  bool? _readBool(Object? value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final t = value.trim().toLowerCase();
+      if (t == 'true' || t == '1' || t == 'yes' || t == 'on') return true;
+      if (t == 'false' || t == '0' || t == 'no' || t == 'off') return false;
+    }
+    return null;
   }
 
   Map<String, dynamic> _readMap(Object? value) {

@@ -62,7 +62,7 @@ class V2etDashboardPage extends HookConsumerWidget {
         if (!context.mounted) return;
         showDialog<void>(
           context: context,
-          builder: (_) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: Text(zh ? '系统公告' : 'Notice'),
             content: SizedBox(
               width: 460,
@@ -91,7 +91,7 @@ class V2etDashboardPage extends HookConsumerWidget {
             ),
             actions: [
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 child: Text(zh ? '我知道了' : 'OK'),
               ),
             ],

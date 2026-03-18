@@ -33,9 +33,9 @@ class V2etPortalApi {
             id: _readInt(row['id']),
             name: _readString(row['name']) ?? 'Plan',
             prices: _extractPrices(row),
-            traffic: _readInt(row['transfer_enable']),
+            traffic: _extractTraffic(row),
             speed: _speedLabel(row['speed_limit']),
-            deviceLimit: _readInt(row['device_limit']),
+            deviceLimit: _extractDeviceLimit(row),
             features: _extractFeatures(row),
             raw: row,
           ),
@@ -138,15 +138,64 @@ class V2etPortalApi {
     };
     final result = <String, double>{};
     for (final entry in mapping.entries) {
-      final cents = _readInt(row[entry.value]);
-      if (cents != null && cents > 0) {
-        result[entry.key] = cents / 100;
+      final raw = row[entry.value];
+      final parsed = _parsePrice(raw);
+      if (parsed != null && parsed > 0) {
+        result[entry.key] = parsed;
       }
     }
     if (result.isEmpty) {
       result['onetime'] = 0;
     }
     return result;
+  }
+
+  double? _parsePrice(Object? raw) {
+    if (raw == null) return null;
+    if (raw is String) {
+      final value = raw.trim();
+      if (value.isEmpty) return null;
+      if (value.contains('.')) {
+        return double.tryParse(value);
+      }
+      final cents = int.tryParse(value);
+      if (cents == null) return null;
+      return cents / 100;
+    }
+    if (raw is int) {
+      return raw / 100;
+    }
+    if (raw is num) {
+      if (raw % 1 != 0) return raw.toDouble();
+      return raw.toDouble() / 100;
+    }
+    return null;
+  }
+
+  int? _extractTraffic(Map<String, dynamic> row) {
+    final candidates = [
+      row['transfer_enable'],
+      row['traffic_limit'],
+      row['data_limit'],
+      row['volume_limit'],
+    ];
+    for (final value in candidates) {
+      final parsed = _readInt(value);
+      if (parsed != null && parsed > 0) return parsed;
+    }
+    return null;
+  }
+
+  int? _extractDeviceLimit(Map<String, dynamic> row) {
+    final candidates = [row['device_limit'], row['ip_limit'], row['devices']];
+    for (final value in candidates) {
+      final parsed = _readInt(value);
+      if (parsed != null) {
+        if (parsed <= 0) return null;
+        return parsed;
+      }
+    }
+    return null;
   }
 
   List<String> _extractFeatures(Map<String, dynamic> row) {
@@ -178,6 +227,14 @@ class V2etPortalApi {
   }
 
   String? _speedLabel(Object? raw) {
+    if (raw is String) {
+      final t = raw.trim();
+      if (t.isEmpty) return null;
+      if (t.contains(RegExp(r'[a-zA-Z]'))) return t;
+      final value = int.tryParse(t);
+      if (value == null || value <= 0) return null;
+      return '${value}Mbps';
+    }
     final speed = _readInt(raw);
     if (speed == null || speed <= 0) {
       return null;

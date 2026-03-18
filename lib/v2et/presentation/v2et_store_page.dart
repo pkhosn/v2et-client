@@ -126,6 +126,8 @@ class _OfferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final featureRows = _featureRows(offer.features);
+    final allPrices = _priceEntries(offer);
+    final mainPrice = allPrices.isEmpty ? null : allPrices.first;
 
     return Container(
       decoration: BoxDecoration(
@@ -147,16 +149,39 @@ class _OfferCard extends StatelessWidget {
                   style: TextStyle(color: Color(0xFF2F2A39), fontSize: 20),
                 ),
                 TextSpan(
-                  text: _mainPrice(offer),
+                  text: mainPrice == null ? '0.00' : mainPrice.$2.toStringAsFixed(2),
                   style: const TextStyle(color: Color(0xFF4D387C), fontSize: 44, fontWeight: FontWeight.w800),
                 ),
                 TextSpan(
-                  text: _mainBilling(offer),
+                  text: mainPrice == null ? (zh ? '/未定义' : '/undefined') : _periodSuffix(mainPrice.$1),
                   style: const TextStyle(color: Color(0xFF484451), fontSize: 18),
                 ),
               ],
             ),
           ),
+          if (allPrices.length > 1) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: allPrices
+                  .skip(1)
+                  .map(
+                    (e) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE9E4EF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${_periodLabel(e.$1)} ¥${e.$2.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF3F3A49)),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [
@@ -239,15 +264,14 @@ class _OfferCard extends StatelessWidget {
     return '${mb.toStringAsFixed(mb >= 100 ? 0 : 2)}MB';
   }
 
-  String _mainPrice(V2etStoreOffer c) {
-    if (c.prices.isEmpty) return '0.00';
-    final key = c.prices.keys.first;
-    return c.prices[key]!.toStringAsFixed(2);
+  List<(String, double)> _priceEntries(V2etStoreOffer c) {
+    const order = ['month', 'quarter', 'half_year', 'year', 'two_year', 'three_year', 'onetime', 'reset'];
+    final entries = c.prices.entries.toList();
+    entries.sort((a, b) => order.indexOf(a.key).compareTo(order.indexOf(b.key)));
+    return entries.map((e) => (e.key, e.value)).toList();
   }
 
-  String _mainBilling(V2etStoreOffer c) {
-    if (c.prices.isEmpty) return zh ? '/未定义' : '/undefined';
-    final key = c.prices.keys.first;
+  String _periodSuffix(String key) {
     return switch (key) {
       'month' => zh ? '/月付' : '/month',
       'quarter' => zh ? '/季付' : '/quarter',
@@ -258,6 +282,20 @@ class _OfferCard extends StatelessWidget {
       'onetime' => zh ? '/一次性' : '/one-time',
       'reset' => zh ? '/重置包' : '/reset',
       _ => zh ? '/周期' : '/period',
+    };
+  }
+
+  String _periodLabel(String key) {
+    return switch (key) {
+      'month' => zh ? '月付' : 'Month',
+      'quarter' => zh ? '季付' : 'Quarter',
+      'half_year' => zh ? '半年' : 'Half-year',
+      'year' => zh ? '年付' : 'Year',
+      'two_year' => zh ? '两年' : '2-year',
+      'three_year' => zh ? '三年' : '3-year',
+      'onetime' => zh ? '一次性' : 'One-time',
+      'reset' => zh ? '重置包' : 'Reset',
+      _ => zh ? '周期' : 'Period',
     };
   }
 

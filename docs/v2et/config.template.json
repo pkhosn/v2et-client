@@ -1,0 +1,21 @@
+{
+  "api_url": "https://your-v2board-api.example.com",
+  "features": {
+    "show_notice_popup": true
+  },
+  "theme": {
+    "primary": "#5B3F88",
+    "surface": "#F3F1F8"
+  },
+  "banners": [],
+  "crisp": {
+    "website_id": ""
+  },
+  "builtin_proxy": {
+    "enabled": false
+  },
+  "ports": {
+    "allow_custom": true,
+    "default": 10808
+  }
+}

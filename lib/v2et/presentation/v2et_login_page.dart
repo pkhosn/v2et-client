@@ -10,7 +10,6 @@ import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
 import 'package:hiddify/gen/translations.g.dart';
-import 'package:hiddify/utils/uri_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class V2etLoginPage extends HookConsumerWidget {
@@ -45,42 +44,16 @@ class V2etLoginPage extends HookConsumerWidget {
     final obscurePassword = useState(true);
     final locale = ref.watch(localePreferencesProvider);
 
-    Future<Uri> resolvePanelBase() async {
-      final input = Uri.parse(panelConfigUrl.trim());
-      return ref.read(v2etEndpointResolverProvider).resolveBaseUrl(input);
+    void openRegister() {
+      ref
+          .read(inAppNotificationControllerProvider)
+          .showInfoToast(tr('注册功能暂不可用', 'Register is not available yet'));
     }
 
-    Future<void> openRegister() async {
-      try {
-        final base = await resolvePanelBase();
-        final candidates = [
-          base.replace(path: '/#/register'),
-          base.replace(path: '/register'),
-          base.replace(path: '/auth/register'),
-        ];
-        for (final uri in candidates) {
-          if (await UriUtils.tryLaunch(uri)) {
-            return;
-          }
-        }
-      } catch (_) {}
-    }
-
-    Future<void> openForgotPassword() async {
-      try {
-        final base = await resolvePanelBase();
-        final candidates = [
-          base.replace(path: '/#/forget'),
-          base.replace(path: '/#/reset'),
-          base.replace(path: '/forget'),
-          base.replace(path: '/password/reset'),
-        ];
-        for (final uri in candidates) {
-          if (await UriUtils.tryLaunch(uri)) {
-            return;
-          }
-        }
-      } catch (_) {}
+    void openForgotPassword() {
+      ref
+          .read(inAppNotificationControllerProvider)
+          .showInfoToast(tr('重置密码功能暂不可用', 'Password reset is not available yet'));
     }
 
     Future<void> submit() async {

@@ -1,5 +1,6 @@
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_api.dart';
+import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -24,6 +25,15 @@ final v2etNoticesProvider = FutureProvider<List<V2etNotice>>((ref) async {
 });
 
 final v2etBannersProvider = Provider<List<V2etBanner>>((ref) {
+  final runtime = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+  final remoteBanners = runtime?.banners ?? const [];
+  if (remoteBanners.isNotEmpty) {
+    return remoteBanners
+        .map(
+          (b) => V2etBanner(title: b.title, imageUrl: b.imageUrl, targetUrl: b.targetUrl),
+        )
+        .toList();
+  }
   return const [
     V2etBanner(title: '新品套餐', imageUrl: 'https://dummyimage.com/1200x360/ece8f5/5b3f88&text=V2ET+Banner'),
   ];

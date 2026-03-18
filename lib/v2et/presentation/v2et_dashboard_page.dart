@@ -1,15 +1,21 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/app_info/app_info_provider.dart';
+import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
+import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
+import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class V2etDashboardPage extends HookConsumerWidget {
@@ -30,6 +36,11 @@ class V2etDashboardPage extends HookConsumerWidget {
     final connection = ref.watch(connectionNotifierProvider);
     final activeProfile = ref.watch(activeProfileProvider).asData?.value;
     final serviceMode = ref.watch(ConfigOptions.serviceMode);
+    final session = ref.watch(v2etSessionProvider).valueOrNull;
+    final notices = ref.watch(v2etNoticesProvider).valueOrNull ?? const [];
+    final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+    final selectedNode = useState<String?>(null);
+    final noticeShown = useState(false);
 
     final subInfo = activeProfile is RemoteProfileEntity ? activeProfile.subInfo : null;
     final used = subInfo?.consumption ?? 0;
@@ -40,6 +51,55 @@ class V2etDashboardPage extends HookConsumerWidget {
       AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
       _ => false,
     };
+
+    useEffect(() {
+      final popupEnabled = runtimeConfig?.enableNoticePopup ?? true;
+      if (noticeShown.value || !popupEnabled || !(session?.hasToken ?? false) || notices.isEmpty) {
+        return null;
+      }
+      noticeShown.value = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text(zh ? '系统公告' : 'Notice'),
+            content: SizedBox(
+              width: 460,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: notices
+                      .take(3)
+                      .map(
+                        (n) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
+                              Text(n.content),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(zh ? '我知道了' : 'OK'),
+              ),
+            ],
+          ),
+        );
+      });
+      return null;
+    }, [runtimeConfig?.enableNoticePopup, notices.length, session?.accessToken]);
 
     Future<void> setSmart() async {
       await ref.read(ConfigOptions.serviceMode.notifier).update(
@@ -196,9 +256,76 @@ class V2etDashboardPage extends HookConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 18),
+            Center(
+              child: _PowerButton(
+                enabled: canToggle,
+                onTap: () async => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                tr('开始连接', 'Start Connection'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(height: 14),
             _Card(
-              onTap: () => context.goNamed('proxies'),
+              onTap: () async {
+                final tags = await _readNodeTags(ref, activeProfile);
+                if (!context.mounted) return;
+                if (tags.isEmpty) {
+                  ref
+                      .read(inAppNotificationControllerProvider)
+                      .showInfoToast(tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
+                  return;
+                }
+                final picked = await showModalBottomSheet<String>(
+                  context: context,
+                  backgroundColor: const Color(0xFFF5F2F8),
+                  isScrollControlled: true,
+                  builder: (ctx) {
+                    return SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tr('选择节点', 'Select Node'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: MediaQuery.of(ctx).size.height * 0.6,
+                              child: ListView.separated(
+                                itemCount: tags.length,
+                                separatorBuilder: (_, _) => const Divider(height: 1),
+                                itemBuilder: (_, i) {
+                                  final tag = tags[i];
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text(tag),
+                                    trailing: selectedNode.value == tag
+                                        ? const Icon(Icons.check_rounded, color: Color(0xFF5A3D89))
+                                        : null,
+                                    onTap: () => Navigator.of(ctx).pop(tag),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+                if (picked != null && picked.isNotEmpty) {
+                  selectedNode.value = picked;
+                }
+              },
               child: Row(
                 children: [
                   Container(
@@ -214,26 +341,17 @@ class V2etDashboardPage extends HookConsumerWidget {
                       children: [
                         Text(tr('选择节点', 'Select Node'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
                         const SizedBox(height: 2),
-                        Text(tr('自动选择', 'Auto Select'), style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700)),
+                        Text(
+                          selectedNode.value ?? tr('自动选择', 'Auto Select'),
+                          style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
                   const Icon(Icons.chevron_right_rounded, color: Color(0xFF4C4755), size: 28),
                 ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            Center(
-              child: _PowerButton(
-                enabled: canToggle,
-                onTap: () async => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                tr('开始连接', 'Start Connection'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(height: 18),
@@ -259,6 +377,15 @@ class V2etDashboardPage extends HookConsumerWidget {
                   onTap: toggleTun,
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: () => context.go('/settings'),
+                icon: const Icon(Icons.settings_rounded, color: Color(0xFF3E3947)),
+                tooltip: tr('设置', 'Settings'),
+              ),
             ),
           ],
         ),
@@ -289,6 +416,40 @@ class V2etDashboardPage extends HookConsumerWidget {
       unitIndex++;
     }
     return '${size.toStringAsFixed(size >= 100 ? 0 : 2)} ${units[unitIndex]}';
+  }
+
+  Future<List<String>> _readNodeTags(WidgetRef ref, ProfileEntity? activeProfile) async {
+    if (activeProfile == null) return const [];
+    final repo = await ref.read(profileRepositoryProvider.future);
+    final result = await repo.getRawConfig(activeProfile.id).run();
+    return result.match((_) => const <String>[], _extractNodeTags);
+  }
+
+  List<String> _extractNodeTags(String raw) {
+    try {
+      final data = jsonDecode(raw);
+      if (data is! Map) return const [];
+      final outbounds = data['outbounds'];
+      if (outbounds is! List) return const [];
+      const ignoredTypes = {
+        'selector',
+        'urltest',
+        'direct',
+        'block',
+        'dns',
+      };
+      final tags = <String>[];
+      for (final item in outbounds) {
+        if (item is! Map) continue;
+        final type = item['type']?.toString().toLowerCase() ?? '';
+        final tag = item['tag']?.toString().trim() ?? '';
+        if (tag.isEmpty || ignoredTypes.contains(type)) continue;
+        tags.add(tag);
+      }
+      return tags.toSet().toList();
+    } catch (_) {
+      return const [];
+    }
   }
 }
 

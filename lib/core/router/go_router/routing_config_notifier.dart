@@ -141,6 +141,19 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
             path: '/v2et-login',
             builder: (_, _) => const V2etLoginPage(),
           ),
+        if (v2etMode)
+          GoRoute(
+            name: 'settings',
+            path: '/settings',
+            builder: (context, _) => FocusScope(
+              node: branchesScope['settings'],
+              child: PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (_, _) => context.goNamed('home'),
+                child: SettingsPage(),
+              ),
+            ),
+          ),
         StatefulShellRoute.indexedStack(
           builder: (_, _, navigationShell) => MyAdaptiveLayout(
             navigationShell: navigationShell,

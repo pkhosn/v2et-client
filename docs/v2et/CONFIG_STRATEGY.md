@@ -25,6 +25,19 @@ These values should come from OSS JSON and can be updated without repackaging:
 - `ports` and custom port settings
 - feature flags
 
+Current runtime keys tracked in app:
+
+- `features.show_notice_popup` (公告弹窗开关)
+- `theme.primary` / `theme.surface` (软件主色/背景色)
+- `crisp.website_id` (客服系统 ID)
+- `banners[]` (轮播图数据)
+- `builtin_proxy.enabled` (内置代理开关)
+- `ports.allow_custom` / `ports.default` (端口自定义策略)
+
+Template file:
+
+- `docs/v2et/config.template.json`
+
 ## 3) Security Baseline
 
 Important: bootstrap URL cannot be fully hidden from a determined reverse engineer.

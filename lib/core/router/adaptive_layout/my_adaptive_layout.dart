@@ -183,7 +183,7 @@ class _V2etDesktopSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 104,
+      width: 78,
       decoration: const BoxDecoration(
         color: Color(0xFFF0ECF4),
         border: Border(right: BorderSide(color: Color(0xFFE4DFEB))),
@@ -192,11 +192,11 @@ class _V2etDesktopSidebar extends StatelessWidget {
         children: [
           const SizedBox(height: 16),
           Container(
-            width: 54,
-            height: 54,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: const Color(0xFFE8E2F1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: const Center(
               child: Text(
@@ -205,12 +205,12 @@ class _V2etDesktopSidebar extends StatelessWidget {
                   color: Color(0xFF4E5DCC),
                   fontWeight: FontWeight.w800,
                   fontStyle: FontStyle.italic,
-                  fontSize: 30,
+                  fontSize: 24,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 22),
           for (var i = 0; i < actions.length; i++)
             _V2etNavItem(
               icon: actions[i].icon,
@@ -246,34 +246,37 @@ class _V2etNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: SizedBox(
-          width: 84,
+          width: 68,
           child: Column(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: selected ? const Color(0xFFE8DBFF) : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   icon,
+                  size: 21,
                   color: selected ? const Color(0xFF4D367A) : const Color(0xFF5A5663),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 12,
                   color: const Color(0xFF2A2434),
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

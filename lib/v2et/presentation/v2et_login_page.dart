@@ -377,7 +377,6 @@ class V2etLoginPage extends HookConsumerWidget {
                   ),
                 ),
               ),
-            ),
           ),
         ],
       ),

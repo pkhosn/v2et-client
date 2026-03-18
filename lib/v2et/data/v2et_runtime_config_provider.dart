@@ -12,6 +12,10 @@ class V2etRuntimeConfig {
     required this.builtinProxyEnabled,
     required this.allowCustomPort,
     required this.defaultPort,
+    required this.officialSiteUrl,
+    required this.groupUrl,
+    required this.inviteManageUrl,
+    required this.giftCardHelpUrl,
   });
 
   final bool enableNoticePopup;
@@ -22,6 +26,10 @@ class V2etRuntimeConfig {
   final bool builtinProxyEnabled;
   final bool allowCustomPort;
   final int? defaultPort;
+  final String? officialSiteUrl;
+  final String? groupUrl;
+  final String? inviteManageUrl;
+  final String? giftCardHelpUrl;
 }
 
 class V2etRuntimeBanner {
@@ -54,6 +62,10 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
         builtinProxyEnabled: false,
         allowCustomPort: true,
         defaultPort: null,
+        officialSiteUrl: null,
+        groupUrl: null,
+        inviteManageUrl: null,
+        giftCardHelpUrl: null,
       );
     }
 
@@ -101,6 +113,28 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       'v2et.ports.default',
     ]);
 
+    final officialSiteUrl = _readStringByPaths(map, const [
+      'links.official_site',
+      'links.official_website',
+      'official_site',
+      'official_website',
+    ]);
+    final groupUrl = _readStringByPaths(map, const [
+      'links.group',
+      'links.join_group',
+      'join_group',
+    ]);
+    final inviteManageUrl = _readStringByPaths(map, const [
+      'links.invite_manage',
+      'links.invite',
+      'invite_manage_url',
+    ]);
+    final giftCardHelpUrl = _readStringByPaths(map, const [
+      'links.gift_card_help',
+      'links.gift_card',
+      'gift_card_help_url',
+    ]);
+
     return V2etRuntimeConfig(
       enableNoticePopup: enabled ?? true,
       primaryColorHex: primaryColor,
@@ -110,6 +144,10 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       builtinProxyEnabled: builtinProxyEnabled,
       allowCustomPort: allowCustomPort,
       defaultPort: defaultPort,
+      officialSiteUrl: officialSiteUrl,
+      groupUrl: groupUrl,
+      inviteManageUrl: inviteManageUrl,
+      giftCardHelpUrl: giftCardHelpUrl,
     );
   } catch (_) {
     return const V2etRuntimeConfig(
@@ -121,6 +159,10 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       builtinProxyEnabled: false,
       allowCustomPort: true,
       defaultPort: null,
+      officialSiteUrl: null,
+      groupUrl: null,
+      inviteManageUrl: null,
+      giftCardHelpUrl: null,
     );
   }
 });

@@ -33,6 +33,7 @@ Current runtime keys tracked in app:
 - `banners[]` (轮播图数据)
 - `builtin_proxy.enabled` (内置代理开关)
 - `ports.allow_custom` / `ports.default` (端口自定义策略)
+- `links.official_site` / `links.join_group` / `links.invite_manage` / `links.gift_card_help` (我的页外链配置)
 
 Template file:
 

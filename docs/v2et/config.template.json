@@ -17,5 +17,11 @@
   "ports": {
     "allow_custom": true,
     "default": 10808
+  },
+  "links": {
+    "official_site": "https://yourdomain.com",
+    "join_group": "https://t.me/your_group",
+    "invite_manage": "https://yourdomain.com/#/invite",
+    "gift_card_help": "https://yourdomain.com/#/gift-card"
   }
 }

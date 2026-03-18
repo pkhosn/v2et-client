@@ -64,6 +64,102 @@ class V2etPortalApi {
     return counters;
   }
 
+  Future<List<V2etOrderRecord>> fetchOrders(V2boardSession session) async {
+    final json = await _authGet(session, '/api/v1/user/order/fetch');
+    final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
+    return rows
+        .map(
+          (row) => V2etOrderRecord(
+            tradeNo: _readString(row['trade_no']) ?? '--',
+            status: _readInt(row['status']) ?? 0,
+            totalAmount: _readMoney(row['total_amount']) ?? 0,
+            createdAt: _readDate(row['created_at']),
+            planName: _readString(_readMapNullable(row['plan'])?['name']),
+            period: _readString(row['period']),
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<V2etTrafficRecord>> fetchTrafficLogs(V2boardSession session) async {
+    final json = await _authGet(session, '/api/v1/user/stat/getTrafficLog');
+    final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
+    return rows
+        .map(
+          (row) => V2etTrafficRecord(
+            upload: _readInt(row['u']) ?? 0,
+            download: _readInt(row['d']) ?? 0,
+            recordAt: _readUnix(row['record_at']),
+            serverRate: _readNum(row['server_rate'])?.toDouble() ?? 1.0,
+          ),
+        )
+        .toList();
+  }
+
+  Future<V2etInviteInfo> fetchInviteInfo(V2boardSession session) async {
+    final json = await _authGet(session, '/api/v1/user/invite/fetch');
+    final data = _readMapNullable(json['data'])?['data'] ?? json['data'];
+    final map = _readMap(data);
+    final codes = _readList(map['codes'])
+        .map((e) => _readString(e['code']))
+        .whereType<String>()
+        .toList();
+    final statRaw = map['stat'];
+    final stat = <int>[];
+    if (statRaw is List) {
+      for (final item in statRaw) {
+        final v = _readInt(item) ?? 0;
+        stat.add(v);
+      }
+    }
+    while (stat.length < 5) {
+      stat.add(0);
+    }
+    return V2etInviteInfo(codes: codes, stat: stat);
+  }
+
+  Future<void> generateInviteCode(V2boardSession session) async {
+    await _authGet(session, '/api/v1/user/invite/save');
+  }
+
+  Future<bool> redeemCouponPlan({
+    required V2boardSession session,
+    required int planId,
+    required String periodField,
+    required String couponCode,
+  }) async {
+    await _authPost(
+      session,
+      '/api/v1/user/coupon/check',
+      data: {
+        'code': couponCode,
+        'plan_id': planId,
+      },
+    );
+
+    final save = await _authPost(
+      session,
+      '/api/v1/user/order/save',
+      data: {
+        'plan_id': planId,
+        'period': periodField,
+        'coupon_code': couponCode,
+      },
+    );
+    final tradeNo = _readString(_readMapNullable(save['data'])?['data'] ?? save['data']);
+    if (tradeNo == null || tradeNo.isEmpty) {
+      throw StateError('Failed to create coupon order');
+    }
+
+    final checkout = await _authPost(
+      session,
+      '/api/v1/user/order/checkout',
+      data: {'trade_no': tradeNo},
+    );
+    final type = _readInt(_readMapNullable(checkout['data'])?['type'] ?? checkout['type']) ?? -1;
+    return type == -1;
+  }
+
   Future<Map<String, dynamic>> _authGet(
     V2boardSession session,
     String path,
@@ -83,6 +179,41 @@ class V2etPortalApi {
           uri,
           options: Options(
             headers: {'Accept': 'application/json', 'Authorization': auth},
+          ),
+        );
+        return _readMap(response.data);
+      } on DioException catch (e) {
+        last = e;
+      }
+    }
+    throw last ?? StateError('Portal request failed.');
+  }
+
+  Future<Map<String, dynamic>> _authPost(
+    V2boardSession session,
+    String path, {
+    required Map<String, Object?> data,
+  }) async {
+    final uri = session.baseUrl.replace(
+      path: path,
+      query: null,
+      fragment: null,
+    );
+    DioException? last;
+    for (final auth in [
+      session.accessToken.trim(),
+      'Bearer ${session.accessToken.trim()}',
+    ]) {
+      try {
+        final response = await _dio.postUri<Object?>(
+          uri,
+          data: data,
+          options: Options(
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': auth,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
           ),
         );
         return _readMap(response.data);
@@ -124,6 +255,31 @@ class V2etPortalApi {
     if (value is int) return value;
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  num? _readNum(Object? value) {
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value);
+    return null;
+  }
+
+  double? _readMoney(Object? value) {
+    final n = _readNum(value);
+    if (n == null) return null;
+    return n.toDouble() / 100;
+  }
+
+  DateTime? _readUnix(Object? value) {
+    final seconds = _readInt(value);
+    if (seconds == null || seconds <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true).toLocal();
+  }
+
+  DateTime? _readDate(Object? value) {
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value.trim())?.toLocal();
+    }
     return null;
   }
 

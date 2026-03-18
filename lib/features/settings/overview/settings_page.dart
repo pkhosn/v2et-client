@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hiddify/core/app_info/app_info_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
@@ -31,6 +32,7 @@ class SettingsPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    final appInfo = ref.watch(appInfoProvider).valueOrNull;
     // final scrollController = useScrollController();
 
     // useMemoized(
@@ -193,6 +195,11 @@ class SettingsPage extends HookConsumerWidget {
               namedLocation: context.namedLocation('about'),
             ),
           ],
+          ListTile(
+            leading: const Icon(Icons.new_releases_outlined),
+            title: const Text('Version'),
+            subtitle: Text(appInfo == null ? '--' : '${appInfo.version} (${appInfo.buildNumber})'),
+          ),
         ],
       ),
     );

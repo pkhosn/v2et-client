@@ -74,3 +74,33 @@ final v2etSupportEntriesProvider = FutureProvider<List<V2etSupportEntry>>((ref) 
     const V2etSupportEntry(title: '礼品卡兑换', route: 'gift-card'),
   ];
 });
+
+final v2etOrdersProvider = FutureProvider<List<V2etOrderRecord>>((ref) async {
+  final session = await ref.watch(v2etSessionProvider.future);
+  if (session == null || !session.hasToken) return const [];
+  try {
+    return await ref.watch(v2etPortalApiProvider).fetchOrders(session);
+  } catch (_) {
+    return const [];
+  }
+});
+
+final v2etTrafficLogsProvider = FutureProvider<List<V2etTrafficRecord>>((ref) async {
+  final session = await ref.watch(v2etSessionProvider.future);
+  if (session == null || !session.hasToken) return const [];
+  try {
+    return await ref.watch(v2etPortalApiProvider).fetchTrafficLogs(session);
+  } catch (_) {
+    return const [];
+  }
+});
+
+final v2etInviteInfoProvider = FutureProvider<V2etInviteInfo?>((ref) async {
+  final session = await ref.watch(v2etSessionProvider.future);
+  if (session == null || !session.hasToken) return null;
+  try {
+    return await ref.watch(v2etPortalApiProvider).fetchInviteInfo(session);
+  } catch (_) {
+    return null;
+  }
+});

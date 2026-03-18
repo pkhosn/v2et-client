@@ -16,6 +16,10 @@ class V2etRuntimeConfig {
     required this.groupUrl,
     required this.inviteManageUrl,
     required this.giftCardHelpUrl,
+    required this.supportProvider,
+    required this.supportUrl,
+    required this.supportScriptUrl,
+    required this.supportEmbedHtml,
   });
 
   final bool enableNoticePopup;
@@ -30,6 +34,10 @@ class V2etRuntimeConfig {
   final String? groupUrl;
   final String? inviteManageUrl;
   final String? giftCardHelpUrl;
+  final String? supportProvider;
+  final String? supportUrl;
+  final String? supportScriptUrl;
+  final String? supportEmbedHtml;
 }
 
 class V2etRuntimeBanner {
@@ -45,10 +53,7 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
   try {
     final response = await dio.getUri<Object?>(
       Uri.parse(V2etBootstrapConfig.defaultConfigUrl),
-      options: Options(
-        headers: const {'Accept': 'application/json,text/plain,*/*'},
-        responseType: ResponseType.json,
-      ),
+      options: Options(headers: const {'Accept': 'application/json,text/plain,*/*'}, responseType: ResponseType.json),
     );
 
     final map = _asMap(response.data);
@@ -66,6 +71,10 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
         groupUrl: null,
         inviteManageUrl: null,
         giftCardHelpUrl: null,
+        supportProvider: null,
+        supportUrl: null,
+        supportScriptUrl: null,
+        supportEmbedHtml: null,
       );
     }
 
@@ -80,38 +89,28 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       'v2et.show_notice_popup',
     ]);
 
-    final primaryColor = _readStringByPaths(map, const [
-      'theme.primary',
-      'v2et.theme.primary',
-      'colors.primary',
-    ]);
-    final surfaceColor = _readStringByPaths(map, const [
-      'theme.surface',
-      'v2et.theme.surface',
-      'colors.surface',
-    ]);
+    final primaryColor = _readStringByPaths(map, const ['theme.primary', 'v2et.theme.primary', 'colors.primary']);
+    final surfaceColor = _readStringByPaths(map, const ['theme.surface', 'v2et.theme.surface', 'colors.surface']);
     final crispId = _readStringByPaths(map, const [
       'crisp.website_id',
+      'crisp.id',
+      'crispid',
       'features.crisp.website_id',
+      'features.crispid',
       'v2et.crisp.website_id',
+      'v2et.crispid',
     ]);
-    final builtinProxyEnabled = _readBoolByPaths(map, const [
+    final builtinProxyEnabled =
+        _readBoolByPaths(map, const [
           'builtin_proxy.enabled',
           'features.builtin_proxy.enabled',
           'v2et.builtin_proxy.enabled',
         ]) ??
         false;
-    final allowCustomPort = _readBoolByPaths(map, const [
-          'ports.allow_custom',
-          'features.ports.allow_custom',
-          'v2et.ports.allow_custom',
-        ]) ??
+    final allowCustomPort =
+        _readBoolByPaths(map, const ['ports.allow_custom', 'features.ports.allow_custom', 'v2et.ports.allow_custom']) ??
         true;
-    final defaultPort = _readIntByPaths(map, const [
-      'ports.default',
-      'features.ports.default',
-      'v2et.ports.default',
-    ]);
+    final defaultPort = _readIntByPaths(map, const ['ports.default', 'features.ports.default', 'v2et.ports.default']);
 
     final officialSiteUrl = _readStringByPaths(map, const [
       'links.official_site',
@@ -119,20 +118,37 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       'official_site',
       'official_website',
     ]);
-    final groupUrl = _readStringByPaths(map, const [
-      'links.group',
-      'links.join_group',
-      'join_group',
-    ]);
-    final inviteManageUrl = _readStringByPaths(map, const [
-      'links.invite_manage',
-      'links.invite',
-      'invite_manage_url',
-    ]);
+    final groupUrl = _readStringByPaths(map, const ['links.group', 'links.join_group', 'join_group']);
+    final inviteManageUrl = _readStringByPaths(map, const ['links.invite_manage', 'links.invite', 'invite_manage_url']);
     final giftCardHelpUrl = _readStringByPaths(map, const [
       'links.gift_card_help',
       'links.gift_card',
       'gift_card_help_url',
+    ]);
+    final supportProvider = _readStringByPaths(map, const [
+      'support.provider',
+      'features.support.provider',
+      'v2et.support.provider',
+    ]);
+    final supportUrl = _readStringByPaths(map, const [
+      'support.url',
+      'features.support.url',
+      'v2et.support.url',
+      'links.support',
+      'links.customer_service',
+      'customer_service_url',
+    ]);
+    final supportScriptUrl = _readStringByPaths(map, const [
+      'support.script_url',
+      'features.support.script_url',
+      'v2et.support.script_url',
+      'support.js_url',
+    ]);
+    final supportEmbedHtml = _readStringByPaths(map, const [
+      'support.embed_html',
+      'features.support.embed_html',
+      'v2et.support.embed_html',
+      'support.html',
     ]);
 
     return V2etRuntimeConfig(
@@ -148,6 +164,10 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       groupUrl: groupUrl,
       inviteManageUrl: inviteManageUrl,
       giftCardHelpUrl: giftCardHelpUrl,
+      supportProvider: supportProvider,
+      supportUrl: supportUrl,
+      supportScriptUrl: supportScriptUrl,
+      supportEmbedHtml: supportEmbedHtml,
     );
   } catch (_) {
     return const V2etRuntimeConfig(
@@ -163,6 +183,10 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       groupUrl: null,
       inviteManageUrl: null,
       giftCardHelpUrl: null,
+      supportProvider: null,
+      supportUrl: null,
+      supportScriptUrl: null,
+      supportEmbedHtml: null,
     );
   }
 });
@@ -245,11 +269,7 @@ Object? _readPath(Map<String, dynamic> root, String path) {
 }
 
 List<V2etRuntimeBanner> _readBanners(Map<String, dynamic> map) {
-  final candidates = [
-    _readPath(map, 'banners'),
-    _readPath(map, 'features.banners'),
-    _readPath(map, 'v2et.banners'),
-  ];
+  final candidates = [_readPath(map, 'banners'), _readPath(map, 'features.banners'), _readPath(map, 'v2et.banners')];
   for (final candidate in candidates) {
     if (candidate is! List) continue;
     final items = <V2etRuntimeBanner>[];

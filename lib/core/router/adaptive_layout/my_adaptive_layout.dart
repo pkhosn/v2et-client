@@ -8,6 +8,7 @@ import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
+import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class MyAdaptiveLayout extends HookConsumerWidget {
@@ -40,13 +41,13 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         } else {
           // focus node does not change => true.
           if (primaryFocusHash.value == FocusManager.instance.primaryFocus.hashCode) {
-              if (branchesScope.values.any((node) => node.hasFocus)) {
-                navScopeNode.requestFocus();
-              } else if (navScopeNode.hasFocus) {
-                branchesScope[_scopeKeyForIndex()]?.requestFocus();
-              }
+            if (branchesScope.values.any((node) => node.hasFocus)) {
+              navScopeNode.requestFocus();
+            } else if (navScopeNode.hasFocus) {
+              branchesScope[_scopeKeyForIndex()]?.requestFocus();
             }
           }
+        }
         return true;
       }
 
@@ -69,6 +70,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       actions: actions,
                       selectedIndex: navigationShell.currentIndex,
                       onTap: (index) => _onTap(context, index),
+                      onNoticeTap: () => ref.read(v2etNoticeDialogTriggerProvider.notifier).state++,
                       onSettingsTap: () => context.go('/settings'),
                     ),
                     Expanded(child: navigationShell),
@@ -115,7 +117,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
             ? FocusScope(
                 node: navScopeNode,
                 child: NavigationBar(
-                  selectedIndex: v2etMode ? navigationShell.currentIndex : (navigationShell.currentIndex <= 1 ? navigationShell.currentIndex : 0),
+                  selectedIndex: v2etMode
+                      ? navigationShell.currentIndex
+                      : (navigationShell.currentIndex <= 1 ? navigationShell.currentIndex : 0),
                   destinations: _navDests(_actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode)),
                   onDestinationSelected: (index) => _onTap(context, index),
                 ),
@@ -175,12 +179,14 @@ class _V2etDesktopSidebar extends StatelessWidget {
     required this.actions,
     required this.selectedIndex,
     required this.onTap,
+    required this.onNoticeTap,
     required this.onSettingsTap,
   });
 
   final List<ShellRouteAction> actions;
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback onNoticeTap;
   final VoidCallback onSettingsTap;
 
   @override
@@ -197,10 +203,7 @@ class _V2etDesktopSidebar extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8E2F1),
-              borderRadius: BorderRadius.circular(10),
-            ),
+            decoration: BoxDecoration(color: const Color(0xFFE8E2F1), borderRadius: BorderRadius.circular(10)),
             child: const Center(
               child: Text(
                 'K',
@@ -223,6 +226,10 @@ class _V2etDesktopSidebar extends StatelessWidget {
             ),
           const Spacer(),
           IconButton(
+            onPressed: onNoticeTap,
+            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF6D6977), size: 24),
+          ),
+          IconButton(
             onPressed: onSettingsTap,
             icon: const Icon(Icons.settings_rounded, color: Color(0xFF6D6977), size: 24),
           ),
@@ -234,12 +241,7 @@ class _V2etDesktopSidebar extends StatelessWidget {
 }
 
 class _V2etNavItem extends StatelessWidget {
-  const _V2etNavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+  const _V2etNavItem({required this.icon, required this.label, required this.selected, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -264,11 +266,7 @@ class _V2etNavItem extends StatelessWidget {
                   color: selected ? const Color(0xFFE8DBFF) : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  icon,
-                  size: 21,
-                  color: selected ? const Color(0xFF4D367A) : const Color(0xFF5A5663),
-                ),
+                child: Icon(icon, size: 21, color: selected ? const Color(0xFF4D367A) : const Color(0xFF5A5663)),
               ),
               const SizedBox(height: 2),
               Text(
@@ -290,11 +288,7 @@ class _V2etNavItem extends StatelessWidget {
 }
 
 class _V2etBottomBar extends StatelessWidget {
-  const _V2etBottomBar({
-    required this.actions,
-    required this.selectedIndex,
-    required this.onTap,
-  });
+  const _V2etBottomBar({required this.actions, required this.selectedIndex, required this.onTap});
 
   final List<ShellRouteAction> actions;
   final int selectedIndex;

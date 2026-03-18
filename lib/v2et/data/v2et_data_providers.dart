@@ -59,3 +59,5 @@ final v2etHasActiveSessionProvider = Provider<bool>((ref) {
   final session = ref.watch(v2etSessionProvider).valueOrNull;
   return session?.hasToken ?? false;
 });
+
+final v2etNoticeDialogTriggerProvider = StateProvider<int>((ref) => 0);

@@ -20,6 +20,7 @@ These values should come from OSS JSON and can be updated without repackaging:
 - `api_base_urls` (multi API and failover)
 - `theme` (primary/accent/semantic colors)
 - `crisp.website_id`
+- `support` (provider/url/script/html)
 - `banners`
 - `builtin_proxy`
 - `ports` and custom port settings
@@ -30,10 +31,15 @@ Current runtime keys tracked in app:
 - `features.show_notice_popup` (公告弹窗开关)
 - `theme.primary` / `theme.surface` (软件主色/背景色)
 - `crisp.website_id` (客服系统 ID)
+- `support.provider` / `support.url` / `support.script_url` / `support.embed_html` (多客服平台动态接入，不重打包)
 - `banners[]` (轮播图数据)
 - `builtin_proxy.enabled` (内置代理开关)
 - `ports.allow_custom` / `ports.default` (端口自定义策略)
 - `links.official_site` / `links.join_group` / `links.invite_manage` / `links.gift_card_help` (我的页外链配置)
+
+Runtime compatibility aliases currently supported:
+
+- Crisp ID: `crisp.website_id`, `crisp.id`, `crispid`, `features.crisp.website_id`, `features.crispid`, `v2et.crisp.website_id`, `v2et.crispid`
 
 Template file:
 

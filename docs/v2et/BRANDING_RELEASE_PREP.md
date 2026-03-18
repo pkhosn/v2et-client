@@ -108,3 +108,31 @@ This repository is currently aligned to brand `V2ET` for:
 - default version baseline `1.0.0+1`
 
 Before every release, verify all files above again to avoid old brand remnants in installers.
+
+## 5) Login UI placeholder items to replace before production package
+
+Current login screen can use temporary brand text/assets during iteration.
+
+Before production packaging, verify and replace in:
+
+- `lib/v2et/presentation/v2et_login_page.dart`
+  - left panel brand title/subtitle/copyright
+  - temporary logo image source
+
+## 6) Runtime customer-service integration (no repack)
+
+The client supports dynamic support entry via remote config:
+
+- `crisp.website_id` (or alias keys listed in `CONFIG_STRATEGY.md`)
+- `support.url` (direct web客服 URL)
+- `support.script_url` (external JS script injection)
+- `support.embed_html` (custom HTML injection)
+
+Priority in client:
+
+1. `support.url`
+2. `crisp.website_id`
+3. `support.embed_html`
+4. `support.script_url`
+
+This allows switching客服平台 without rebuilding the app package.

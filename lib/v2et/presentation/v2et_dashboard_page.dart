@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
@@ -12,13 +11,12 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
-import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
+import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class V2etDashboardPage extends HookConsumerWidget {
   const V2etDashboardPage({super.key});
@@ -29,18 +27,13 @@ class V2etDashboardPage extends HookConsumerWidget {
     final compact = MediaQuery.sizeOf(context).width < 900;
     String tr(String a, String b) => zh ? a : b;
 
-    final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
-    final savedCredentialsFuture = useMemoized(
-      () => ref.read(v2etRepositoryProvider).readSavedCredentials(),
-    );
-    final savedCredentials = useFuture(savedCredentialsFuture).data;
     final connection = ref.watch(connectionNotifierProvider);
     final activeProfile = ref.watch(activeProfileProvider).asData?.value;
-    final serviceMode = ref.watch(ConfigOptions.serviceMode);
     final session = ref.watch(v2etSessionProvider).valueOrNull;
     final notices = ref.watch(v2etNoticesProvider).valueOrNull ?? const [];
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
-    final proxyGroup = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
+    final supportUri = buildV2etSupportUri(runtimeConfig);
+    final noticeTrigger = ref.watch(v2etNoticeDialogTriggerProvider);
     final selectedNode = useState<String?>(null);
     final noticeShown = useState(false);
     final pingOverrides = useState<Map<String, int?>>({});
@@ -48,11 +41,6 @@ class V2etDashboardPage extends HookConsumerWidget {
     final pingLoading = useState<Set<String>>({});
     final linkLoading = useState<Set<String>>({});
 
-    final subInfo = activeProfile is RemoteProfileEntity ? activeProfile.subInfo : null;
-    final used = subInfo?.consumption ?? 0;
-    final total = subInfo?.total ?? sub?.transferEnableBytes ?? 0;
-    final ratio = total > 0 ? (used / total).clamp(0.0, 1.0) : 0.0;
-    final days = subInfo?.remaining.inDays ?? 0;
     final canToggle = switch (connection) {
       AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
       _ => false,
@@ -74,30 +62,25 @@ class V2etDashboardPage extends HookConsumerWidget {
                 children: notices.isEmpty
                     ? [Text(zh ? '暂无公告' : 'No notice')]
                     : notices
-                        .take(5)
-                        .map(
-                          (n) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 4),
-                                Text(n.content),
-                              ],
+                          .take(5)
+                          .map(
+                            (n) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 4),
+                                  Text(n.content),
+                                ],
+                              ),
                             ),
-                          ),
-                        )
-                        .toList(),
+                          )
+                          .toList(),
               ),
             ),
           ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(zh ? '我知道了' : 'OK'),
-            ),
-          ],
+          actions: [FilledButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(zh ? '我知道了' : 'OK'))],
         ),
       );
     }
@@ -112,149 +95,36 @@ class V2etDashboardPage extends HookConsumerWidget {
       return null;
     }, [runtimeConfig?.enableNoticePopup, notices.length, session?.accessToken]);
 
-    Future<void> setSmart() async {
-      await ref.read(ConfigOptions.serviceMode.notifier).update(
-            PlatformUtils.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy,
-          );
-    }
-
-    Future<void> setGlobal() async {
-      await ref.read(ConfigOptions.serviceMode.notifier).update(ServiceMode.proxy);
-    }
-
-    Future<void> toggleTun() async {
-      final next = serviceMode == ServiceMode.tun
-          ? (PlatformUtils.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy)
-          : ServiceMode.tun;
-      await ref.read(ConfigOptions.serviceMode.notifier).update(next);
-    }
+    useEffect(() {
+      if (noticeTrigger <= 0 || notices.isEmpty) {
+        return null;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => showNoticesDialog());
+      return null;
+    }, [noticeTrigger]);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2F8),
+      floatingActionButton: supportUri == null
+          ? null
+          : FloatingActionButton(
+              mini: true,
+              backgroundColor: const Color(0xFF5A3D89),
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+              },
+              child: const Icon(Icons.support_agent_rounded),
+            ),
       body: SafeArea(
         child: ListView(
           padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, compact ? 12 : 20),
           children: [
-            _Card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Color(0xFF634691),
-                        child: Icon(Icons.person, color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _safeText(savedCredentials?.email, tr('未登录', 'Not logged in')),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                const Icon(Icons.verified, color: Color(0xFF5E438E), size: 14),
-                                const SizedBox(width: 4),
-                                Text(
-                                  sub?.planName ?? '--',
-                                  style: const TextStyle(color: Color(0xFF5E438E), fontWeight: FontWeight.w700),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF5A5563)),
-                              const SizedBox(width: 4),
-                              Text(tr('到期时间', 'Expire'), style: const TextStyle(color: Color(0xFF5A5563))),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: const Color(0xFFE9E5EF),
-                            ),
-                            child: Text(
-                              _date(sub?.expiredAt),
-                              style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF4F4A57)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(tr('已用流量', 'Used Traffic'), style: const TextStyle(fontSize: 18, color: Color(0xFF2D2737))),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Spacer(),
-                      Text(
-                        '${_bytes(used)} / ${_bytes(total)}',
-                        style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: ratio,
-                      minHeight: 12,
-                      backgroundColor: const Color(0xFFE4E0E8),
-                      color: const Color(0xFF5A3D89),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF585362)),
-                      const SizedBox(width: 4),
-                      Text(
-                        tr('${days < 0 ? 0 : days}天后重置流量', '${days < 0 ? 0 : days} days to reset'),
-                        style: const TextStyle(color: Color(0xFF585362)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF573C87),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(44),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      ),
-                      onPressed: () => context.go('/store'),
-                      icon: const Icon(Icons.sync_rounded, size: 18),
-                      label: Text(tr('续费订阅', 'Renew Subscription')),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
             Center(
               child: _PowerButton(
                 enabled: canToggle,
                 active: isConnected,
-                onTap: () async => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
+                onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
               ),
             ),
             const SizedBox(height: 12),
@@ -306,7 +176,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                     const Spacer(),
                                     OutlinedButton.icon(
                                       onPressed: () async {
-                                        final groupTag = group?.tag?.toString().trim();
+                                        final groupTag = _readGroupTag(group);
                                         await sheetRef
                                             .read(proxiesOverviewNotifierProvider.notifier)
                                             .urlTest(groupTag == null || groupTag.isEmpty ? 'select' : groupTag);
@@ -334,7 +204,9 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                 'PING ${_latencyText(item.pingMs)} | LINK ${_latencyText(item.linkMs)}'
                                                 '${item.isTimeout ? (zh ? ' · 超时' : ' · timeout') : ''}',
                                                 style: TextStyle(
-                                                  color: item.isTimeout ? const Color(0xFFC62828) : const Color(0xFF5A5563),
+                                                  color: item.isTimeout
+                                                      ? const Color(0xFFC62828)
+                                                      : const Color(0xFF5A5563),
                                                   fontWeight: item.isTimeout ? FontWeight.w700 : FontWeight.w500,
                                                 ),
                                               ),
@@ -358,8 +230,9 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                         await sheetRef
                                                             .read(proxiesOverviewNotifierProvider.notifier)
                                                             .urlTest(item.tag);
-                                                        final refreshed =
-                                                            sheetRef.read(proxiesOverviewNotifierProvider).valueOrNull;
+                                                        final refreshed = sheetRef
+                                                            .read(proxiesOverviewNotifierProvider)
+                                                            .valueOrNull;
                                                         final tested = _readDelayForTag(refreshed, item.tag) ?? 65535;
                                                         pingOverrides.value = {
                                                           ...pingOverrides.value,
@@ -381,8 +254,8 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                     loading: linkLoading.value.contains(item.tag),
                                                     timeout: item.linkMs == null || item.linkMs == 65535,
                                                     onTap: () async {
-                                                      final groupTag = group?.tag?.toString().trim() ?? 'select';
-                                                      final restoreTag = group?.selected?.toString().trim();
+                                                      final groupTag = _readGroupTag(group) ?? 'select';
+                                                      final restoreTag = _readSelectedTag(group);
                                                       linkLoading.value = {...linkLoading.value, item.tag};
                                                       try {
                                                         final tested = await _runLinkProbe(
@@ -434,7 +307,10 @@ class V2etDashboardPage extends HookConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(tr('选择节点', 'Select Node'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
+                        Text(
+                          tr('选择节点', 'Select Node'),
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           selectedNode.value ?? tr('自动选择', 'Auto Select'),
@@ -449,80 +325,11 @@ class V2etDashboardPage extends HookConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _ModePill(
-                  label: tr('智能分流', 'Smart'),
-                  selected: serviceMode != ServiceMode.proxy && serviceMode != ServiceMode.tun,
-                  onTap: setSmart,
-                ),
-                const SizedBox(width: 8),
-                _ModePill(
-                  label: tr('全局代理', 'Global'),
-                  selected: serviceMode == ServiceMode.proxy,
-                  onTap: setGlobal,
-                ),
-                const SizedBox(width: 8),
-                _ModePill(
-                  label: 'TUN',
-                  icon: Icons.visibility_off_outlined,
-                  selected: serviceMode == ServiceMode.tun,
-                  onTap: toggleTun,
-                ),
-              ],
-            ),
-            if (compact) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: showNoticesDialog,
-                      icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF3E3947)),
-                      tooltip: tr('公告', 'Notices'),
-                    ),
-                    IconButton(
-                      onPressed: () => context.go('/settings'),
-                      icon: const Icon(Icons.settings_rounded, color: Color(0xFF3E3947)),
-                      tooltip: tr('设置', 'Settings'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            const SizedBox(height: 10),
           ],
         ),
       ),
     );
-  }
-
-  String _date(DateTime? date) {
-    if (date == null) return '--';
-    final d = date.toLocal();
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$m-$day';
-  }
-
-  String _safeText(String? value, String fallback) {
-    if (value == null || value.trim().isEmpty) return fallback;
-    return value.trim();
-  }
-
-  String _bytes(int? value) {
-    if (value == null || value <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var unitIndex = 0;
-    var size = value.toDouble();
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
-    }
-    return '${size.toStringAsFixed(size >= 100 ? 0 : 2)} ${units[unitIndex]}';
   }
 
   Future<List<String>> _readNodeTags(WidgetRef ref, ProfileEntity? activeProfile) async {
@@ -538,13 +345,7 @@ class V2etDashboardPage extends HookConsumerWidget {
       if (data is! Map) return const [];
       final outbounds = data['outbounds'];
       if (outbounds is! List) return const [];
-      const ignoredTypes = {
-        'selector',
-        'urltest',
-        'direct',
-        'block',
-        'dns',
-      };
+      const ignoredTypes = {'selector', 'urltest', 'direct', 'block', 'dns'};
       final tags = <String>[];
       for (final item in outbounds) {
         if (item is! Map) continue;
@@ -615,6 +416,26 @@ class V2etDashboardPage extends HookConsumerWidget {
       }
     } catch (_) {}
     return null;
+  }
+
+  String? _readGroupTag(dynamic proxyGroup) {
+    try {
+      final value = proxyGroup.tag?.toString().trim();
+      if (value == null || value.isEmpty) return null;
+      return value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _readSelectedTag(dynamic proxyGroup) {
+    try {
+      final value = proxyGroup.selected?.toString().trim();
+      if (value == null || value.isEmpty) return null;
+      return value;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<int?> _runLinkProbe(
@@ -734,11 +555,7 @@ class _LatencyAction extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (loading)
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 1.6, color: fg),
-                )
+                SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6, color: fg))
               else
                 Icon(icon, size: 14, color: fg),
               const SizedBox(width: 4),
@@ -775,46 +592,6 @@ class _Card extends StatelessWidget {
           ),
           padding: const EdgeInsets.all(14),
           child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _ModePill extends StatelessWidget {
-  const _ModePill({required this.label, required this.selected, this.onTap, this.icon});
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF5A3D89) : const Color(0xFFE4DFEA),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: selected ? Colors.white : const Color(0xFF4F4A56)),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF2D2737),
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -871,10 +648,7 @@ class _PowerButton extends HookWidget {
             height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const RadialGradient(
-                colors: [Color(0xFFF9F7FC), Color(0xFFE2DDE9)],
-                radius: 0.78,
-              ),
+              gradient: const RadialGradient(colors: [Color(0xFFF9F7FC), Color(0xFFE2DDE9)], radius: 0.78),
               boxShadow: [
                 BoxShadow(
                   color: active ? const Color(0x555A3D89) : const Color(0x2A3B2A53),

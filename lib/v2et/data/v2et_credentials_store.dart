@@ -24,6 +24,20 @@ class V2etCredentialsStore {
   static const _subUrlKey = 'v2et.subscription_url';
   static const _subFetchedAtKey = 'v2et.subscription_fetched_at';
 
+  static const _preferenceKeys = <String>{
+    _baseUrlKey,
+    _emailKey,
+    _passwordKey,
+    _tokenKey,
+    _tokenAtKey,
+    _planNameKey,
+    _transferEnableKey,
+    _expiredAtKey,
+    _nodeCountKey,
+    _subUrlKey,
+    _subFetchedAtKey,
+  };
+
   Future<V2boardCredentials?> readCredentials() async {
     final baseUrlRaw = _preferences.getString(_baseUrlKey);
     final email = _preferences.getString(_emailKey);
@@ -46,7 +60,9 @@ class V2etCredentialsStore {
       return null;
     }
     final createdAtRaw = _preferences.getString(_tokenAtKey);
-    final createdAt = createdAtRaw == null ? DateTime.now().toUtc() : DateTime.tryParse(createdAtRaw) ?? DateTime.now().toUtc();
+    final createdAt = createdAtRaw == null
+        ? DateTime.now().toUtc()
+        : DateTime.tryParse(createdAtRaw) ?? DateTime.now().toUtc();
     return V2boardSession(baseUrl: baseUrl, accessToken: token, createdAt: createdAt);
   }
 
@@ -112,6 +128,14 @@ class V2etCredentialsStore {
     }
   }
 
+  Future<void> clearAll() async {
+    for (final key in _preferenceKeys) {
+      await _preferences.remove(key);
+    }
+    await _deleteSecure(_passwordKey);
+    await _deleteSecure(_tokenKey);
+  }
+
   Future<String?> _readSecure(String key) async {
     try {
       return await _secureStorage.read(key: key);
@@ -125,6 +149,14 @@ class V2etCredentialsStore {
       await _secureStorage.write(key: key, value: value);
     } catch (_) {
       await _preferences.setString(key, value);
+    }
+  }
+
+  Future<void> _deleteSecure(String key) async {
+    try {
+      await _secureStorage.delete(key: key);
+    } catch (_) {
+      await _preferences.remove(key);
     }
   }
 }

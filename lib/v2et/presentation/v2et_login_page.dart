@@ -21,8 +21,6 @@ enum _AuthMode { login, register, forgot }
 class V2etLoginPage extends HookConsumerWidget {
   const V2etLoginPage({super.key});
 
-  static const _buildMarker = 'UI-PATCH-B1';
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
@@ -44,29 +42,23 @@ class V2etLoginPage extends HookConsumerWidget {
     final autoLogin = useState(true);
     final obscurePassword = useState(true);
     final locale = ref.watch(localePreferencesProvider);
-    final authConfigFuture = useMemoized(() async {
-      try {
-        final baseUrl = await resolvedBaseUrl();
-        return await ref.read(v2boardApiProvider).fetchAuthConfig(baseUrl);
-      } catch (_) {
-        return const V2boardAuthConfig(
-          requireEmailVerify: false,
-          requireInviteCode: false,
-          emailWhitelistSuffixes: [],
-        );
-      }
-    });
-    final authConfig = useFuture(authConfigFuture).data ??
-        const V2boardAuthConfig(
-          requireEmailVerify: false,
-          requireInviteCode: false,
-          emailWhitelistSuffixes: [],
-        );
 
     Future<Uri> resolvedBaseUrl() {
       final resolver = ref.read(v2etEndpointResolverProvider);
       return resolver.resolveBaseUrl(Uri.parse(panelConfigUrl.trim()));
     }
+
+    final authConfigFuture = useMemoized(() async {
+      try {
+        final baseUrl = await resolvedBaseUrl();
+        return await ref.read(v2boardApiProvider).fetchAuthConfig(baseUrl);
+      } catch (_) {
+        return const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
+      }
+    });
+    final authConfig =
+        useFuture(authConfigFuture).data ??
+        const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
 
     Future<void> submit() async {
       if (loading.value) return;
@@ -84,7 +76,9 @@ class V2etLoginPage extends HookConsumerWidget {
         final sub = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
         ref.read(v2etSessionUnlockedProvider.notifier).state = true;
         unawaited(
-          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((error) {
+          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((
+            error,
+          ) {
             ref
                 .read(inAppNotificationControllerProvider)
                 .showErrorToast(tr('订阅导入失败: ', 'Subscription import failed: ') + error.toString());
@@ -139,25 +133,22 @@ class V2etLoginPage extends HookConsumerWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.translate_rounded, color: Colors.white, size: 18),
+                                  const Text(
+                                    '文',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                                  ),
                                   const SizedBox(width: 6),
                                   Text(
                                     locale.localeName,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2E2250),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.public_rounded, color: Colors.white, size: 20),
                           ),
                         ],
                       ),
@@ -166,20 +157,23 @@ class V2etLoginPage extends HookConsumerWidget {
                         child: Column(
                           children: [
                             Container(
-                              width: 190,
-                              height: 190,
+                              width: 170,
+                              height: 170,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(color: const Color(0xFF6E6294).withOpacity(0.35), width: 2),
                               ),
-                              child: const Icon(Icons.shield_rounded, color: Color(0xFFF4F0FB), size: 74),
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Image.asset('assets/images/tray_icon.png'),
+                              ),
                             ),
                             const SizedBox(height: 30),
                             const Text(
-                              'Pltea',
+                              'V2ET',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 72,
+                                fontSize: 66,
                                 letterSpacing: 1,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -194,7 +188,7 @@ class V2etLoginPage extends HookConsumerWidget {
                       ),
                       const Spacer(),
                       const Text(
-                        '© 2026 Pltea. All rights reserved.',
+                        '© 2026 V2ET. All rights reserved.',
                         style: TextStyle(color: Color(0xFFC5BED7), fontSize: 12),
                       ),
                     ],
@@ -235,7 +229,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.translate_rounded, size: 16),
+                                        const Text('文', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                                         const SizedBox(width: 4),
                                         Text(locale.localeName),
                                       ],
@@ -243,24 +237,6 @@ class V2etLoginPage extends HookConsumerWidget {
                                   ),
                                 ),
                               const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEDE7F5),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Text(
-                                  _buildMarker,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF4C347C),
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              IconButton(onPressed: () {}, icon: const Icon(Icons.public_rounded, size: 24)),
                             ],
                           ),
                           const SizedBox(height: 20),
@@ -383,8 +359,9 @@ class V2etLoginPage extends HookConsumerWidget {
                               TextButton.icon(
                                 onPressed: loading.value
                                     ? null
-                                    : () => authMode.value =
-                                          authMode.value == _AuthMode.register ? _AuthMode.login : _AuthMode.register,
+                                    : () => authMode.value = authMode.value == _AuthMode.register
+                                          ? _AuthMode.login
+                                          : _AuthMode.register,
                                 icon: Icon(
                                   authMode.value == _AuthMode.register
                                       ? Icons.login_rounded
@@ -401,12 +378,11 @@ class V2etLoginPage extends HookConsumerWidget {
                               TextButton.icon(
                                 onPressed: loading.value
                                     ? null
-                                    : () => authMode.value =
-                                          authMode.value == _AuthMode.forgot ? _AuthMode.login : _AuthMode.forgot,
+                                    : () => authMode.value = authMode.value == _AuthMode.forgot
+                                          ? _AuthMode.login
+                                          : _AuthMode.forgot,
                                 icon: Icon(
-                                  authMode.value == _AuthMode.forgot
-                                      ? Icons.login_rounded
-                                      : Icons.help_outline_rounded,
+                                  authMode.value == _AuthMode.forgot ? Icons.login_rounded : Icons.help_outline_rounded,
                                   size: 18,
                                 ),
                                 label: Text(
@@ -534,7 +510,10 @@ class _RegisterPanelState extends State<_RegisterPanel> {
               ],
             ),
           ] else ...[
-            TextField(controller: email, decoration: InputDecoration(labelText: tr('邮箱', 'Email'))),
+            TextField(
+              controller: email,
+              decoration: InputDecoration(labelText: tr('邮箱', 'Email')),
+            ),
           ],
           TextField(
             controller: password,
@@ -566,21 +545,23 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                           final builtEmail = _composeEmail();
                           if (builtEmail.isEmpty) return;
                           if (!_validateEmailWhitelist(builtEmail)) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))),
-                            );
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))));
                             return;
                           }
                           setState(() => sendingCode = true);
                           try {
                             await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: builtEmail);
                             if (!mounted) return;
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
                           } catch (e) {
                             if (!mounted) return;
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
                           } finally {
                             if (mounted) setState(() => sendingCode = false);
                           }
@@ -600,9 +581,9 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                       final p = password.text;
                       if (e.isEmpty || p.isEmpty) return;
                       if (!_validateEmailWhitelist(e)) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))));
                         return;
                       }
                       if (widget.config.requireEmailVerify && emailCode.text.trim().isEmpty) return;
@@ -618,12 +599,14 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                         );
                         if (!mounted) return;
                         widget.onDone();
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text(tr('注册成功，请登录', 'Register success, please login'))));
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(tr('注册成功，请登录', 'Register success, please login'))));
                       } catch (e) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text(tr('注册失败: ', 'Register failed: ') + e.toString())));
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(tr('注册失败: ', 'Register failed: ') + e.toString())));
                       } finally {
                         if (mounted) setState(() => submitting = false);
                       }
@@ -638,12 +621,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
 }
 
 class _ForgotPasswordPanel extends StatefulWidget {
-  const _ForgotPasswordPanel({
-    required this.zh,
-    required this.baseUrl,
-    required this.api,
-    required this.onDone,
-  });
+  const _ForgotPasswordPanel({required this.zh, required this.baseUrl, required this.api, required this.onDone});
 
   final bool zh;
   final Uri baseUrl;
@@ -685,7 +663,10 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
         children: [
           Text(tr('重置密码', 'Reset password'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
           const SizedBox(height: 10),
-          TextField(controller: email, decoration: InputDecoration(labelText: tr('邮箱', 'Email'))),
+          TextField(
+            controller: email,
+            decoration: InputDecoration(labelText: tr('邮箱', 'Email')),
+          ),
           Row(
             children: [
               Expanded(
@@ -705,12 +686,14 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
                         try {
                           await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: e);
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
                         } catch (e) {
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
                         } finally {
                           if (mounted) setState(() => sendingCode = false);
                         }
@@ -737,20 +720,17 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
                       if (e.isEmpty || p.isEmpty || c.isEmpty) return;
                       setState(() => submitting = true);
                       try {
-                        await widget.api.resetPassword(
-                          baseUrl: widget.baseUrl,
-                          email: e,
-                          password: p,
-                          emailCode: c,
-                        );
+                        await widget.api.resetPassword(baseUrl: widget.baseUrl, email: e, password: p, emailCode: c);
                         if (!mounted) return;
                         widget.onDone();
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text(tr('重置成功，请登录', 'Reset success, please login'))));
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(tr('重置成功，请登录', 'Reset success, please login'))));
                       } catch (e) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text(tr('重置失败: ', 'Reset failed: ') + e.toString())));
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(tr('重置失败: ', 'Reset failed: ') + e.toString())));
                       } finally {
                         if (mounted) setState(() => submitting = false);
                       }

@@ -10,6 +10,8 @@ abstract interface class V2etRepository {
 
   Future<V2boardCredentials?> readSavedCredentials();
 
+  Future<void> logout();
+
   V2boardSubscription? readLastSubscription();
 }
 
@@ -46,6 +48,11 @@ class V2etRepositoryImpl implements V2etRepository {
   }
 
   @override
+  Future<void> logout() {
+    return _credentialsStore.clearAll();
+  }
+
+  @override
   V2boardSubscription? readLastSubscription() {
     return _credentialsStore.readLastSubscription();
   }
@@ -64,6 +71,9 @@ class V2etNoopRepository implements V2etRepository {
 
   @override
   Future<V2boardCredentials?> readSavedCredentials() async => null;
+
+  @override
+  Future<void> logout() async {}
 
   @override
   V2boardSubscription? readLastSubscription() => null;

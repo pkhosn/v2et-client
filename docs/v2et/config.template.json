@@ -11,6 +11,12 @@
   "crisp": {
     "website_id": ""
   },
+  "support": {
+    "provider": "crisp",
+    "url": "",
+    "script_url": "",
+    "embed_html": ""
+  },
   "builtin_proxy": {
     "enabled": false
   },

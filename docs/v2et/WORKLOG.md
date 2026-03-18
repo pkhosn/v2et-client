@@ -75,6 +75,12 @@
 2. Add integration tests for login/fetch/import flow
 3. Improve error-to-user-message mapping for common panel failures
 
+### Product/Ops Decisions Captured
+- Added configuration strategy document for production:
+  - `docs/v2et/CONFIG_STRATEGY.md`
+- Defined fixed build-time items vs runtime remote-config items
+- Defined security baseline and signed config envelope plan
+
 ### Notes
 - PAT push over HTTPS failed for workflow files due to missing `workflow` scope.
 - SSH push succeeded and is the default remote method now.

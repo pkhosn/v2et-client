@@ -31,10 +31,10 @@ When starting a new session, read in order:
 - Portal providers now fetch real data from panel APIs (notices/plans/orders/tickets)
 
 ## Next Tasks (in order)
-1. Refine spacing/color/typography to match provided screenshots 1:1
-2. Move V2ET dialog/page strings into translation assets (currently runtime zh/en mapping)
-3. Add fallback mapping for more panel variants in plan/notice response schema
-4. Add tests for token parsing, subscribe URL parsing, and V2ET shell routes
+1. Implement signed remote-config envelope parser and verifier
+2. Add API multi-endpoint failover based on remote config
+3. Apply runtime theme/crisp/banner config from remote payload
+4. Refine spacing/color/typography to match provided screenshots 1:1
 
 ## Working Rules
 - Keep changes small and commit often

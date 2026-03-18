@@ -34,7 +34,8 @@ When starting a new session, read in order:
 1. Implement signed remote-config envelope parser and verifier
 2. Add API multi-endpoint failover based on remote config
 3. Apply runtime theme/crisp/banner config from remote payload
-4. Refine spacing/color/typography to match provided screenshots 1:1
+4. Continue pixel-level UI alignment to provided screenshots (login/dashboard/store/me)
+5. Add direct purchase jump action based on panel checkout path rules
 
 ## Working Rules
 - Keep changes small and commit often

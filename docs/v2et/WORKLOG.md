@@ -81,6 +81,12 @@
 - Defined fixed build-time items vs runtime remote-config items
 - Defined security baseline and signed config envelope plan
 
+### UI/API Progress
+- Store page now reads plan cards directly from V2Board plan API payload
+- Added multi-cycle price rendering (month/quarter/half-year/year/onetime/reset)
+- Added plan feature list extraction from `content/description/remark`
+- Added filter chips (all/recurring/onetime) based on real plan billing model
+
 ### Notes
 - PAT push over HTTPS failed for workflow files due to missing `workflow` scope.
 - SSH push succeeded and is the default remote method now.

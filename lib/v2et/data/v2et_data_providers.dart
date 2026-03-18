@@ -51,3 +51,11 @@ final v2etBootstrapProvider = FutureProvider<void>((ref) async {
 });
 
 final v2etSessionUnlockedProvider = StateProvider<bool>((ref) => false);
+
+final v2etHasActiveSessionProvider = Provider<bool>((ref) {
+  if (ref.watch(v2etSessionUnlockedProvider)) {
+    return true;
+  }
+  final session = ref.watch(v2etSessionProvider).valueOrNull;
+  return session?.hasToken ?? false;
+});

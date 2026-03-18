@@ -82,7 +82,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
   RoutingConfig build() {
     final isMobileBreakpoint = ref.watch(isMobileBreakpointProvider);
     final v2etMode = true;
-    final v2etSessionUnlocked = ref.watch(v2etSessionUnlockedProvider);
+    final v2etSessionUnlocked = ref.watch(v2etHasActiveSessionProvider);
     final bool showProfilesAction;
     if (isMobileBreakpoint == true) {
       showProfilesAction = false;

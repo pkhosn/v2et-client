@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
@@ -41,6 +43,10 @@ class V2etDashboardPage extends HookConsumerWidget {
     final proxyGroup = ref.watch(proxiesOverviewNotifierProvider).valueOrNull;
     final selectedNode = useState<String?>(null);
     final noticeShown = useState(false);
+    final pingOverrides = useState<Map<String, int?>>({});
+    final linkOverrides = useState<Map<String, int?>>({});
+    final pingLoading = useState<Set<String>>({});
+    final linkLoading = useState<Set<String>>({});
 
     final subInfo = activeProfile is RemoteProfileEntity ? activeProfile.subInfo : null;
     final used = subInfo?.consumption ?? 0;
@@ -254,7 +260,7 @@ class V2etDashboardPage extends HookConsumerWidget {
             const SizedBox(height: 12),
             Center(
               child: Text(
-                tr('开始连接', 'Start Connection'),
+                isConnected ? tr('已连接', 'Connected') : tr('开始连接', 'Start Connection'),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ),
@@ -277,7 +283,13 @@ class V2etDashboardPage extends HookConsumerWidget {
                     return Consumer(
                       builder: (context, sheetRef, _) {
                         final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
-                        final entries = _buildNodeEntries(tags, group);
+                        final entries = _buildNodeEntries(
+                          tags,
+                          group,
+                          pingOverrides: pingOverrides.value,
+                          linkOverrides: linkOverrides.value,
+                          zh: zh,
+                        );
                         return SafeArea(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -294,10 +306,13 @@ class V2etDashboardPage extends HookConsumerWidget {
                                     const Spacer(),
                                     OutlinedButton.icon(
                                       onPressed: () async {
-                                        await sheetRef.read(proxiesOverviewNotifierProvider.notifier).urlTest('select');
+                                        final groupTag = group?.tag?.toString().trim();
+                                        await sheetRef
+                                            .read(proxiesOverviewNotifierProvider.notifier)
+                                            .urlTest(groupTag == null || groupTag.isEmpty ? 'select' : groupTag);
                                       },
-                                      icon: const Icon(Icons.speed_rounded, size: 16),
-                                      label: Text(tr('测试延迟', 'Latency test')),
+                                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                                      label: Text(tr('刷新线路', 'Refresh routes')),
                                     ),
                                   ],
                                 ),
@@ -313,12 +328,82 @@ class V2etDashboardPage extends HookConsumerWidget {
                                         dense: true,
                                         leading: Text(item.flag, style: const TextStyle(fontSize: 20)),
                                         title: Text(item.tag),
-                                        subtitle: Text(
-                                          'PING ${_latencyText(item.pingMs, zh)} | LINK ${_latencyText(item.linkMs, zh)}',
-                                        ),
-                                        trailing: selectedNode.value == item.tag
-                                            ? const Icon(Icons.check_rounded, color: Color(0xFF5A3D89))
-                                            : null,
+                                        subtitle: item.isSpecial
+                                            ? null
+                                            : Text(
+                                                'PING ${_latencyText(item.pingMs)} | LINK ${_latencyText(item.linkMs)}'
+                                                '${item.isTimeout ? (zh ? ' · 超时' : ' · timeout') : ''}',
+                                                style: TextStyle(
+                                                  color: item.isTimeout ? const Color(0xFFC62828) : const Color(0xFF5A5563),
+                                                  fontWeight: item.isTimeout ? FontWeight.w700 : FontWeight.w500,
+                                                ),
+                                              ),
+                                        trailing: item.isSpecial
+                                            ? selectedNode.value == item.tag
+                                                  ? const Icon(Icons.check_rounded, color: Color(0xFF5A3D89))
+                                                  : null
+                                            : Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  _LatencyAction(
+                                                    label: pingLoading.value.contains(item.tag)
+                                                        ? tr('测试中', 'Testing')
+                                                        : _latencyText(item.pingMs),
+                                                    icon: Icons.network_ping_rounded,
+                                                    loading: pingLoading.value.contains(item.tag),
+                                                    timeout: item.pingMs == null || item.pingMs == 65535,
+                                                    onTap: () async {
+                                                      pingLoading.value = {...pingLoading.value, item.tag};
+                                                      try {
+                                                        await sheetRef
+                                                            .read(proxiesOverviewNotifierProvider.notifier)
+                                                            .urlTest(item.tag);
+                                                        final refreshed =
+                                                            sheetRef.read(proxiesOverviewNotifierProvider).valueOrNull;
+                                                        final tested = _readDelayForTag(refreshed, item.tag) ?? 65535;
+                                                        pingOverrides.value = {
+                                                          ...pingOverrides.value,
+                                                          item.tag: tested <= 0 ? 65535 : tested,
+                                                        };
+                                                      } finally {
+                                                        final next = {...pingLoading.value};
+                                                        next.remove(item.tag);
+                                                        pingLoading.value = next;
+                                                      }
+                                                    },
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  _LatencyAction(
+                                                    label: linkLoading.value.contains(item.tag)
+                                                        ? tr('测试中', 'Testing')
+                                                        : _latencyText(item.linkMs),
+                                                    icon: Icons.bolt_rounded,
+                                                    loading: linkLoading.value.contains(item.tag),
+                                                    timeout: item.linkMs == null || item.linkMs == 65535,
+                                                    onTap: () async {
+                                                      final groupTag = group?.tag?.toString().trim() ?? 'select';
+                                                      final restoreTag = group?.selected?.toString().trim();
+                                                      linkLoading.value = {...linkLoading.value, item.tag};
+                                                      try {
+                                                        final tested = await _runLinkProbe(
+                                                          sheetRef,
+                                                          groupTag: groupTag,
+                                                          outboundTag: item.tag,
+                                                          restoreTag: restoreTag,
+                                                        );
+                                                        linkOverrides.value = {
+                                                          ...linkOverrides.value,
+                                                          item.tag: tested == null || tested <= 0 ? 65535 : tested,
+                                                        };
+                                                      } finally {
+                                                        final next = {...linkLoading.value};
+                                                        next.remove(item.tag);
+                                                        linkLoading.value = next;
+                                                      }
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
                                         onTap: () => Navigator.of(ctx).pop(item.tag),
                                       );
                                     },
@@ -474,30 +559,91 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  List<_NodeEntry> _buildNodeEntries(List<String> tags, dynamic proxyGroup) {
-    final delayMap = <String, int>{};
+  List<_NodeEntry> _buildNodeEntries(
+    List<String> tags,
+    dynamic proxyGroup, {
+    required Map<String, int?> pingOverrides,
+    required Map<String, int?> linkOverrides,
+    required bool zh,
+  }) {
+    final delayMap = <String, int?>{};
+    final lowered = <String>{};
     try {
       final items = proxyGroup?.items as List<dynamic>?;
       if (items != null) {
         for (final item in items) {
           final tag = item.tag?.toString() ?? '';
           final delay = item.urlTestDelay is int ? item.urlTestDelay as int : 0;
-          if (tag.isNotEmpty) delayMap[tag] = delay;
+          if (tag.isNotEmpty) {
+            delayMap[tag] = delay > 0 ? delay : 65535;
+            lowered.add(tag.toLowerCase());
+          }
         }
       }
     } catch (_) {}
 
-    return tags
-        .map((tag) {
-          final delay = delayMap[tag];
-          final d = delay != null && delay > 0 ? delay : null;
-          return _NodeEntry(tag: tag, flag: _flagForTag(tag), pingMs: d, linkMs: d);
-        })
-        .toList();
+    final entries = <_NodeEntry>[];
+    final autoLabel = zh ? '自动选择' : 'Auto Select';
+    final failoverLabel = zh ? '故障转移' : 'Failover';
+    if (!lowered.contains(autoLabel.toLowerCase())) {
+      entries.add(_NodeEntry(tag: autoLabel, flag: '⚡', pingMs: null, linkMs: null, isSpecial: true));
+    }
+    if (!lowered.contains(failoverLabel.toLowerCase())) {
+      entries.add(_NodeEntry(tag: failoverLabel, flag: '🛡️', pingMs: null, linkMs: null, isSpecial: true));
+    }
+
+    entries.addAll(
+      tags.map((tag) {
+        final pingMs = pingOverrides[tag] ?? delayMap[tag] ?? 65535;
+        final linkMs = linkOverrides[tag] ?? 65535;
+        return _NodeEntry(tag: tag, flag: _flagForTag(tag), pingMs: pingMs, linkMs: linkMs, isSpecial: false);
+      }),
+    );
+    return entries;
   }
 
-  String _latencyText(int? ms, bool zh) {
-    if (ms == null || ms <= 0) return zh ? '超时' : 'timeout';
+  int? _readDelayForTag(dynamic proxyGroup, String tag) {
+    try {
+      final items = proxyGroup?.items as List<dynamic>?;
+      if (items == null) return null;
+      for (final item in items) {
+        final currentTag = item.tag?.toString().trim();
+        if (currentTag == tag) {
+          final delay = item.urlTestDelay is int ? item.urlTestDelay as int : 0;
+          return delay > 0 ? delay : 65535;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<int?> _runLinkProbe(
+    WidgetRef ref, {
+    required String groupTag,
+    required String outboundTag,
+    required String? restoreTag,
+  }) async {
+    final repo = ref.read(proxyRepositoryProvider);
+    final selected = await repo.selectProxy(groupTag, outboundTag).run();
+    final canProbe = selected.match((_) => false, (_) => true);
+    if (!canProbe) {
+      return null;
+    }
+
+    final timer = Stopwatch()..start();
+    try {
+      final res = await repo.getCurrentIpInfo(CancelToken()).run();
+      return res.match((_) => null, (_) => timer.elapsedMilliseconds);
+    } finally {
+      timer.stop();
+      if (restoreTag != null && restoreTag.isNotEmpty && restoreTag != outboundTag) {
+        await repo.selectProxy(groupTag, restoreTag).run();
+      }
+    }
+  }
+
+  String _latencyText(int? ms) {
+    if (ms == null || ms <= 0) return '65535';
     return '${ms}ms';
   }
 
@@ -539,12 +685,73 @@ class _NodeEntry {
     required this.flag,
     required this.pingMs,
     required this.linkMs,
+    required this.isSpecial,
   });
 
   final String tag;
   final String flag;
   final int? pingMs;
   final int? linkMs;
+  final bool isSpecial;
+
+  bool get isTimeout {
+    if (isSpecial) return false;
+    return (pingMs == null || pingMs == 65535) || (linkMs == null || linkMs == 65535);
+  }
+}
+
+class _LatencyAction extends StatelessWidget {
+  const _LatencyAction({
+    required this.label,
+    required this.icon,
+    required this.loading,
+    required this.timeout,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool loading;
+  final bool timeout;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = timeout ? const Color(0xFFC62828) : const Color(0xFF1976D2);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2DDEA)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading)
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 1.6, color: fg),
+                )
+              else
+                Icon(icon, size: 14, color: fg),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Card extends StatelessWidget {

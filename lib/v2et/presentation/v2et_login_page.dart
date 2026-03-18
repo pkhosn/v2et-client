@@ -16,6 +16,8 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+enum _AuthMode { login, register, forgot }
+
 class V2etLoginPage extends HookConsumerWidget {
   const V2etLoginPage({super.key});
 
@@ -37,10 +39,29 @@ class V2etLoginPage extends HookConsumerWidget {
     final emailController = useTextEditingController(text: savedCredentials?.email ?? '');
     final passwordController = useTextEditingController(text: savedCredentials?.password ?? '');
     final loading = useState(false);
+    final authMode = useState(_AuthMode.login);
     final rememberPassword = useState(true);
     final autoLogin = useState(true);
     final obscurePassword = useState(true);
     final locale = ref.watch(localePreferencesProvider);
+    final authConfigFuture = useMemoized(() async {
+      try {
+        final baseUrl = await resolvedBaseUrl();
+        return await ref.read(v2boardApiProvider).fetchAuthConfig(baseUrl);
+      } catch (_) {
+        return const V2boardAuthConfig(
+          requireEmailVerify: false,
+          requireInviteCode: false,
+          emailWhitelistSuffixes: [],
+        );
+      }
+    });
+    final authConfig = useFuture(authConfigFuture).data ??
+        const V2boardAuthConfig(
+          requireEmailVerify: false,
+          requireInviteCode: false,
+          emailWhitelistSuffixes: [],
+        );
 
     Future<Uri> resolvedBaseUrl() {
       final resolver = ref.read(v2etEndpointResolverProvider);
@@ -76,49 +97,6 @@ class V2etLoginPage extends HookConsumerWidget {
         ref.read(inAppNotificationControllerProvider).showErrorToast(tr('登录失败: ', 'Login failed: ') + e.toString());
       } finally {
         loading.value = false;
-      }
-    }
-
-    Future<void> openRegister() async {
-      try {
-        final baseUrl = await resolvedBaseUrl();
-        final api = ref.read(v2boardApiProvider);
-        var config = const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false);
-        try {
-          config = await api.fetchAuthConfig(baseUrl);
-        } catch (_) {}
-        if (!context.mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => _RegisterDialog(
-            zh: zh,
-            baseUrl: baseUrl,
-            config: config,
-            api: api,
-          ),
-        );
-      } catch (e) {
-        ref.read(inAppNotificationControllerProvider).showErrorToast(tr('注册失败: ', 'Register failed: ') + e.toString());
-      }
-    }
-
-    Future<void> openForgotPassword() async {
-      try {
-        final baseUrl = await resolvedBaseUrl();
-        final api = ref.read(v2boardApiProvider);
-        if (!context.mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => _ForgotPasswordDialog(
-            zh: zh,
-            baseUrl: baseUrl,
-            api: api,
-          ),
-        );
-      } catch (e) {
-        ref.read(inAppNotificationControllerProvider).showErrorToast(
-          tr('重置密码失败: ', 'Reset password failed: ') + e.toString(),
-        );
       }
     }
 
@@ -324,60 +302,118 @@ class V2etLoginPage extends HookConsumerWidget {
                             ),
                             validator: (value) => (value?.isEmpty ?? true) ? tr('请输入密码', 'Enter password') : null,
                           ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              _LabeledCheckbox(
-                                label: tr('记住密码', 'Remember password'),
-                                value: rememberPassword.value,
-                                onChanged: (v) => rememberPassword.value = v ?? false,
-                              ),
-                              const Spacer(),
-                              _LabeledCheckbox(
-                                label: tr('自动登录', 'Auto Login'),
-                                value: autoLogin.value,
-                                onChanged: (v) => autoLogin.value = v ?? false,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF573C87),
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size.fromHeight(56),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                              onPressed: loading.value ? null : submit,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    loading.value ? tr('登录中...', 'Logging in...') : tr('登录', 'Login'),
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.login_rounded, size: 20),
-                                ],
+                          if (authMode.value == _AuthMode.login) ...[
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                _LabeledCheckbox(
+                                  label: tr('记住密码', 'Remember password'),
+                                  value: rememberPassword.value,
+                                  onChanged: (v) => rememberPassword.value = v ?? false,
+                                ),
+                                const Spacer(),
+                                _LabeledCheckbox(
+                                  label: tr('自动登录', 'Auto Login'),
+                                  value: autoLogin.value,
+                                  onChanged: (v) => autoLogin.value = v ?? false,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF573C87),
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size.fromHeight(56),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                onPressed: loading.value ? null : submit,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      loading.value ? tr('登录中...', 'Logging in...') : tr('登录', 'Login'),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.login_rounded, size: 20),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
+                          ] else ...[
+                            const SizedBox(height: 18),
+                            FutureBuilder<Uri>(
+                              future: resolvedBaseUrl(),
+                              builder: (context, snapshot) {
+                                final baseUrl = snapshot.data;
+                                if (baseUrl == null) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 24),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+                                final api = ref.read(v2boardApiProvider);
+                                if (authMode.value == _AuthMode.register) {
+                                  return _RegisterPanel(
+                                    zh: zh,
+                                    baseUrl: baseUrl,
+                                    config: authConfig,
+                                    api: api,
+                                    onDone: () => authMode.value = _AuthMode.login,
+                                  );
+                                }
+                                return _ForgotPasswordPanel(
+                                  zh: zh,
+                                  baseUrl: baseUrl,
+                                  api: api,
+                                  onDone: () => authMode.value = _AuthMode.login,
+                                );
+                              },
+                            ),
+                          ],
                           const SizedBox(height: 18),
                           Row(
                             children: [
                               TextButton.icon(
-                                onPressed: loading.value ? null : openRegister,
-                                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                                label: Text(tr('注册', 'Register')),
+                                onPressed: loading.value
+                                    ? null
+                                    : () => authMode.value =
+                                          authMode.value == _AuthMode.register ? _AuthMode.login : _AuthMode.register,
+                                icon: Icon(
+                                  authMode.value == _AuthMode.register
+                                      ? Icons.login_rounded
+                                      : Icons.person_add_alt_1_rounded,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  authMode.value == _AuthMode.register
+                                      ? tr('返回登录', 'Back to login')
+                                      : tr('注册', 'Register'),
+                                ),
                               ),
                               const Spacer(),
                               TextButton.icon(
-                                onPressed: loading.value ? null : openForgotPassword,
-                                icon: const Icon(Icons.help_outline_rounded, size: 18),
-                                label: Text(tr('忘记密码？', 'Forgot Password?')),
+                                onPressed: loading.value
+                                    ? null
+                                    : () => authMode.value =
+                                          authMode.value == _AuthMode.forgot ? _AuthMode.login : _AuthMode.forgot,
+                                icon: Icon(
+                                  authMode.value == _AuthMode.forgot
+                                      ? Icons.login_rounded
+                                      : Icons.help_outline_rounded,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  authMode.value == _AuthMode.forgot
+                                      ? tr('返回登录', 'Back to login')
+                                      : tr('忘记密码？', 'Forgot Password?'),
+                                ),
                               ),
                             ],
                           ),
@@ -395,32 +431,43 @@ class V2etLoginPage extends HookConsumerWidget {
   }
 }
 
-class _RegisterDialog extends StatefulWidget {
-  const _RegisterDialog({
+class _RegisterPanel extends StatefulWidget {
+  const _RegisterPanel({
     required this.zh,
     required this.baseUrl,
     required this.config,
     required this.api,
+    required this.onDone,
   });
 
   final bool zh;
   final Uri baseUrl;
   final V2boardAuthConfig config;
   final V2boardApi api;
+  final VoidCallback onDone;
 
   @override
-  State<_RegisterDialog> createState() => _RegisterDialogState();
+  State<_RegisterPanel> createState() => _RegisterPanelState();
 }
 
-class _RegisterDialogState extends State<_RegisterDialog> {
+class _RegisterPanelState extends State<_RegisterPanel> {
   final email = TextEditingController();
   final password = TextEditingController();
   final emailCode = TextEditingController();
   final inviteCode = TextEditingController();
   bool sendingCode = false;
   bool submitting = false;
+  String? selectedSuffix;
 
   String tr(String a, String b) => widget.zh ? a : b;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.config.emailWhitelistSuffixes.isNotEmpty) {
+      selectedSuffix = widget.config.emailWhitelistSuffixes.first;
+    }
+  }
 
   @override
   void dispose() {
@@ -431,139 +478,78 @@ class _RegisterDialogState extends State<_RegisterDialog> {
     super.dispose();
   }
 
+  String _composeEmail() {
+    final raw = email.text.trim();
+    if (raw.isEmpty) return raw;
+    final suffix = selectedSuffix;
+    if (suffix != null && suffix.isNotEmpty && !raw.contains('@')) {
+      return '$raw$suffix';
+    }
+    return raw;
+  }
+
+  bool _validateEmailWhitelist(String value) {
+    final whitelist = widget.config.emailWhitelistSuffixes;
+    if (whitelist.isEmpty) return true;
+    return whitelist.any((suffix) => value.toLowerCase().endsWith(suffix.toLowerCase()));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(tr('注册', 'Register')),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: email, decoration: InputDecoration(labelText: tr('邮箱', 'Email'))),
-            TextField(
-              controller: password,
-              decoration: InputDecoration(labelText: tr('密码', 'Password')),
-              obscureText: true,
-            ),
-            if (widget.config.requireEmailVerify)
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: emailCode,
-                      decoration: InputDecoration(labelText: tr('邮箱验证码', 'Email code')),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: sendingCode
-                        ? null
-                        : () async {
-                            setState(() => sendingCode = true);
-                            try {
-                              await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: email.text.trim());
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
-                            } finally {
-                              if (mounted) setState(() => sendingCode = false);
-                            }
-                          },
-                    child: Text(tr('发送', 'Send')),
-                  ),
-                ],
-              ),
-            if (widget.config.requireInviteCode)
-              TextField(controller: inviteCode, decoration: InputDecoration(labelText: tr('邀请码', 'Invite code'))),
-          ],
-        ),
+    final suffixes = widget.config.emailWhitelistSuffixes;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE8F4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD3CBE0)),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('取消', 'Cancel'))),
-        FilledButton(
-          onPressed: submitting
-              ? null
-              : () async {
-                  final e = email.text.trim();
-                  final p = password.text;
-                  if (e.isEmpty || p.isEmpty) return;
-                  if (widget.config.requireEmailVerify && emailCode.text.trim().isEmpty) return;
-                  if (widget.config.requireInviteCode && inviteCode.text.trim().isEmpty) return;
-                  setState(() => submitting = true);
-                  try {
-                    await widget.api.register(
-                      baseUrl: widget.baseUrl,
-                      email: e,
-                      password: p,
-                      emailCode: emailCode.text.trim(),
-                      inviteCode: inviteCode.text.trim(),
-                    );
-                    if (!mounted) return;
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(tr('注册成功，请登录', 'Register success, please login'))));
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(tr('注册失败: ', 'Register failed: ') + e.toString())));
-                  } finally {
-                    if (mounted) setState(() => submitting = false);
-                  }
-                },
-          child: Text(tr('注册', 'Register')),
-        ),
-      ],
-    );
-  }
-}
-
-class _ForgotPasswordDialog extends StatefulWidget {
-  const _ForgotPasswordDialog({
-    required this.zh,
-    required this.baseUrl,
-    required this.api,
-  });
-
-  final bool zh;
-  final Uri baseUrl;
-  final V2boardApi api;
-
-  @override
-  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
-}
-
-class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
-  final email = TextEditingController();
-  final password = TextEditingController();
-  final emailCode = TextEditingController();
-  bool sendingCode = false;
-  bool submitting = false;
-
-  String tr(String a, String b) => widget.zh ? a : b;
-
-  @override
-  void dispose() {
-    email.dispose();
-    password.dispose();
-    emailCode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(tr('重置密码', 'Reset password')),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(tr('注册账号', 'Register account'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+          const SizedBox(height: 10),
+          if (suffixes.isNotEmpty) ...[
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: email,
+                    decoration: InputDecoration(labelText: tr('邮箱用户名', 'Email username')),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: selectedSuffix,
+                    items: suffixes
+                        .map((suffix) => DropdownMenuItem<String>(value: suffix, child: Text(suffix)))
+                        .toList(),
+                    onChanged: (value) => setState(() => selectedSuffix = value),
+                    decoration: InputDecoration(labelText: tr('后缀', 'Suffix')),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
             TextField(controller: email, decoration: InputDecoration(labelText: tr('邮箱', 'Email'))),
+          ],
+          TextField(
+            controller: password,
+            decoration: InputDecoration(labelText: tr('密码', 'Password')),
+            obscureText: true,
+          ),
+          TextField(
+            controller: inviteCode,
+            decoration: InputDecoration(
+              labelText: widget.config.requireInviteCode
+                  ? tr('邀请码（必填）', 'Invite code (required)')
+                  : tr('邀请码（可选）', 'Invite code (optional)'),
+            ),
+          ),
+          if (widget.config.requireEmailVerify)
             Row(
               children: [
                 Expanded(
@@ -577,9 +563,17 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                   onPressed: sendingCode
                       ? null
                       : () async {
+                          final builtEmail = _composeEmail();
+                          if (builtEmail.isEmpty) return;
+                          if (!_validateEmailWhitelist(builtEmail)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))),
+                            );
+                            return;
+                          }
                           setState(() => sendingCode = true);
                           try {
-                            await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: email.text.trim());
+                            await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: builtEmail);
                             if (!mounted) return;
                             ScaffoldMessenger.of(context)
                                 .showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
@@ -595,47 +589,177 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                 ),
               ],
             ),
-            TextField(
-              controller: password,
-              decoration: InputDecoration(labelText: tr('新密码', 'New password')),
-              obscureText: true,
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      final e = _composeEmail();
+                      final p = password.text;
+                      if (e.isEmpty || p.isEmpty) return;
+                      if (!_validateEmailWhitelist(e)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))),
+                        );
+                        return;
+                      }
+                      if (widget.config.requireEmailVerify && emailCode.text.trim().isEmpty) return;
+                      if (widget.config.requireInviteCode && inviteCode.text.trim().isEmpty) return;
+                      setState(() => submitting = true);
+                      try {
+                        await widget.api.register(
+                          baseUrl: widget.baseUrl,
+                          email: e,
+                          password: p,
+                          emailCode: emailCode.text.trim(),
+                          inviteCode: inviteCode.text.trim(),
+                        );
+                        if (!mounted) return;
+                        widget.onDone();
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(tr('注册成功，请登录', 'Register success, please login'))));
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(tr('注册失败: ', 'Register failed: ') + e.toString())));
+                      } finally {
+                        if (mounted) setState(() => submitting = false);
+                      }
+                    },
+              child: Text(tr('注册', 'Register')),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('取消', 'Cancel'))),
-        FilledButton(
-          onPressed: submitting
-              ? null
-              : () async {
-                  final e = email.text.trim();
-                  final p = password.text;
-                  final c = emailCode.text.trim();
-                  if (e.isEmpty || p.isEmpty || c.isEmpty) return;
-                  setState(() => submitting = true);
-                  try {
-                    await widget.api.resetPassword(
-                      baseUrl: widget.baseUrl,
-                      email: e,
-                      password: p,
-                      emailCode: c,
-                    );
-                    if (!mounted) return;
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(tr('重置成功，请登录', 'Reset success, please login'))));
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text(tr('重置失败: ', 'Reset failed: ') + e.toString())));
-                  } finally {
-                    if (mounted) setState(() => submitting = false);
-                  }
-                },
-          child: Text(tr('提交', 'Submit')),
-        ),
-      ],
+    );
+  }
+}
+
+class _ForgotPasswordPanel extends StatefulWidget {
+  const _ForgotPasswordPanel({
+    required this.zh,
+    required this.baseUrl,
+    required this.api,
+    required this.onDone,
+  });
+
+  final bool zh;
+  final Uri baseUrl;
+  final V2boardApi api;
+  final VoidCallback onDone;
+
+  @override
+  State<_ForgotPasswordPanel> createState() => _ForgotPasswordPanelState();
+}
+
+class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  final emailCode = TextEditingController();
+  bool sendingCode = false;
+  bool submitting = false;
+
+  String tr(String a, String b) => widget.zh ? a : b;
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    emailCode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE8F4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD3CBE0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(tr('重置密码', 'Reset password'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+          const SizedBox(height: 10),
+          TextField(controller: email, decoration: InputDecoration(labelText: tr('邮箱', 'Email'))),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: emailCode,
+                  decoration: InputDecoration(labelText: tr('邮箱验证码', 'Email code')),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: sendingCode
+                    ? null
+                    : () async {
+                        final e = email.text.trim();
+                        if (e.isEmpty) return;
+                        setState(() => sendingCode = true);
+                        try {
+                          await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: e);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
+                        } finally {
+                          if (mounted) setState(() => sendingCode = false);
+                        }
+                      },
+                child: Text(tr('发送', 'Send')),
+              ),
+            ],
+          ),
+          TextField(
+            controller: password,
+            decoration: InputDecoration(labelText: tr('新密码', 'New password')),
+            obscureText: true,
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      final e = email.text.trim();
+                      final p = password.text;
+                      final c = emailCode.text.trim();
+                      if (e.isEmpty || p.isEmpty || c.isEmpty) return;
+                      setState(() => submitting = true);
+                      try {
+                        await widget.api.resetPassword(
+                          baseUrl: widget.baseUrl,
+                          email: e,
+                          password: p,
+                          emailCode: c,
+                        );
+                        if (!mounted) return;
+                        widget.onDone();
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(tr('重置成功，请登录', 'Reset success, please login'))));
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(tr('重置失败: ', 'Reset failed: ') + e.toString())));
+                      } finally {
+                        if (mounted) setState(() => submitting = false);
+                      }
+                    },
+              child: Text(tr('提交', 'Submit')),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

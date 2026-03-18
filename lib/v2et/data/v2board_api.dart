@@ -37,10 +37,12 @@ class V2boardAuthConfig {
   const V2boardAuthConfig({
     required this.requireEmailVerify,
     required this.requireInviteCode,
+    required this.emailWhitelistSuffixes,
   });
 
   final bool requireEmailVerify;
   final bool requireInviteCode;
+  final List<String> emailWhitelistSuffixes;
 }
 
 class V2boardApiStub implements V2boardApi {
@@ -151,6 +153,12 @@ class V2boardApiImpl implements V2boardApi {
     return V2boardAuthConfig(
       requireEmailVerify: _readBool(data['is_email_verify']) ?? false,
       requireInviteCode: _readBool(data['is_invite_force']) ?? false,
+      emailWhitelistSuffixes: _readStringList(
+        data['email_whitelist_suffix'] ??
+            data['email_whitelist_suffixes'] ??
+            data['email_suffix_whitelist'] ??
+            data['email_suffixes'],
+      ),
     );
   }
 
@@ -328,6 +336,17 @@ class V2boardApiImpl implements V2boardApi {
       return value.trim();
     }
     return null;
+  }
+
+  List<String> _readStringList(Object? value) {
+    if (value is! List) {
+      return const [];
+    }
+    return value
+        .map((item) => _readString(item) ?? '')
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
   }
 
   int? _readInt(Object? value) {

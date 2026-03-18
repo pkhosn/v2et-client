@@ -81,7 +81,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
   @override
   RoutingConfig build() {
     final isMobileBreakpoint = ref.watch(isMobileBreakpointProvider);
-    final v2etMode = ref.watch(Preferences.enableV2etAdapter);
+    final v2etMode = true;
     final v2etSessionUnlocked = ref.watch(v2etSessionUnlockedProvider);
     final bool showProfilesAction;
     if (isMobileBreakpoint == true) {
@@ -159,6 +159,17 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                           node: branchesScope['home'],
                           child: const V2etDashboardPage(),
                         ),
+                        routes: <GoRoute>[
+                          GoRoute(
+                            name: 'proxies',
+                            path: '/proxies',
+                            pageBuilder: (_, state) => customTransition(
+                              TransitionType.fade,
+                              state.pageKey,
+                              const ProxiesOverviewPage(),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

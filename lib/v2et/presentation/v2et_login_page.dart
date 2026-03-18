@@ -37,6 +37,7 @@ class V2etLoginPage extends HookConsumerWidget {
       text: savedCredentials?.password ?? '',
     );
     final loading = useState(false);
+    final showAdvanced = useState(false);
 
     Future<void> submit() async {
       if (loading.value) return;
@@ -131,21 +132,42 @@ class V2etLoginPage extends HookConsumerWidget {
                         const SizedBox(height: 8),
                         Text(tr('欢迎回来，请登录您的账号', 'Welcome back, please login')),
                         const SizedBox(height: 24),
-                        TextFormField(
-                          controller: baseUrlController,
-                          decoration: InputDecoration(
-                            labelText: tr('面板地址', 'Panel URL'),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () =>
+                                showAdvanced.value = !showAdvanced.value,
+                            icon: Icon(
+                              showAdvanced.value
+                                  ? Icons.expand_less_rounded
+                                  : Icons.tune_rounded,
+                            ),
+                            label: Text(
+                              tr('高级网络设置', 'Advanced Network Settings'),
+                            ),
                           ),
-                          validator: (value) {
-                            final uri = Uri.tryParse(value?.trim() ?? '');
-                            if (uri == null ||
-                                !uri.hasScheme ||
-                                !uri.hasAuthority)
-                              return tr('请输入有效面板地址', 'Enter valid panel URL');
-                            return null;
-                          },
                         ),
-                        const SizedBox(height: 12),
+                        if (showAdvanced.value) ...[
+                          TextFormField(
+                            controller: baseUrlController,
+                            decoration: InputDecoration(
+                              labelText: tr('配置地址（OSS）', 'Config URL (OSS)'),
+                            ),
+                            validator: (value) {
+                              final uri = Uri.tryParse(value?.trim() ?? '');
+                              if (uri == null ||
+                                  !uri.hasScheme ||
+                                  !uri.hasAuthority) {
+                                return tr(
+                                  '请输入有效配置地址',
+                                  'Enter valid config URL',
+                                );
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         TextFormField(
                           controller: emailController,
                           decoration: InputDecoration(

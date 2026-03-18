@@ -36,6 +36,27 @@ flutter doctor -v
 
 ## 4. 打包前统一步骤
 
+### 4.0 生产环境对象存储地址（必改项）
+
+打包前如需切换生产配置源，请先修改：
+
+- `lib/v2et/config/v2et_bootstrap_config.dart`
+
+字段：
+
+- `V2etBootstrapConfig.defaultConfigUrl`
+
+示例：
+
+```dart
+static const defaultConfigUrl = 'https://hko-1312628321.cos.ap-guangzhou.myqcloud.com/config.json';
+```
+
+说明：
+
+- 客户端默认从该 OSS 地址读取配置 JSON，再解析真实 API。
+- 登录页默认不展示该地址输入框（商业模式）；仅在“高级网络设置”中可手动覆盖。
+
 ```bash
 flutter clean
 flutter pub get

@@ -2,6 +2,7 @@ app_id: 6L903538-42B1-4596-G479-BJ779F21A65D
 publisher: V2ET
 publisher_url: https://github.com/pkhosn/v2et-client
 display_name: V2ET
+executable_name: V2ET.exe
 create_desktop_icon: true
 install_dir_name: "{autopf64}\\V2ET"
 setup_icon_file: windows\runner\resources\app_icon.ico

@@ -15,6 +15,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 class V2etLoginPage extends HookConsumerWidget {
   const V2etLoginPage({super.key});
 
+  static const _buildMarker = 'UI-PATCH-B1';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final zh = Localizations.localeOf(
@@ -252,6 +254,23 @@ class V2etLoginPage extends HookConsumerWidget {
                                 ),
                               ),
                             const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDE7F5),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                _buildMarker,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF4C347C),
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             IconButton(onPressed: () {}, icon: const Icon(Icons.public_rounded, size: 24)),
                           ],
                         ),

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.v2et.client</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>V2ET</name>
+  <summary>Modern Proxy and VPN Manager for Linux</summary>
+
+  <developer_name>V2ET</developer_name>
+  <update_contact>ops@v2et.com</update_contact>
+
+  <description>
+    <p>
+      V2ET is an advanced proxy and VPN client for privacy and control.
+      It supports multiple backend protocols including V2Ray, Xray, Clash, and Sing-box.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">v2et.desktop</launchable>
+  <icon type="stock">v2et</icon>
+
+  <categories>
+    <category>Network</category>
+  </categories>
+
+  <keywords>
+    <keyword>V2ET</keyword>
+    <keyword>Proxy</keyword>
+    <keyword>VPN</keyword>
+  </keywords>
+
+  <mime-types>
+    <mime-type>x-scheme-handler/v2et</mime-type>
+    <mime-type>x-scheme-handler/v2ray</mime-type>
+    <mime-type>x-scheme-handler/v2rayn</mime-type>
+    <mime-type>x-scheme-handler/v2rayng</mime-type>
+    <mime-type>x-scheme-handler/clash</mime-type>
+    <mime-type>x-scheme-handler/clashmeta</mime-type>
+    <mime-type>x-scheme-handler/sing-box</mime-type>
+  </mime-types>
+
+  <url type="homepage">https://github.com/pkhosn/v2et-client</url>
+  <url type="bugtracker">https://github.com/pkhosn/v2et-client/issues</url>
+
+  <provides>
+    <binary>v2et</binary>
+  </provides>
+
+  <translation type="gettext">v2et</translation>
+
+  <custom>
+    <value key="PackageName">v2et</value>
+    <value key="Priority">optional</value>
+    <value key="Section">x11</value>
+    <value key="InstalledSize">6604</value>
+    <value key="Essential">false</value>
+  </custom>
+</component>

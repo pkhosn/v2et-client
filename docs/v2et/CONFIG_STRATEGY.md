@@ -38,6 +38,7 @@ Current runtime keys tracked in app:
 Template file:
 
 - `docs/v2et/config.template.json`
+- `docs/v2et/BRANDING_RELEASE_PREP.md`
 
 ## 3) Security Baseline
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,7 @@ import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
@@ -182,10 +184,13 @@ class V2etDashboardPage extends HookConsumerWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _PowerButton(
-                        enabled: connectEnabled,
-                        active: isConnected,
-                        onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
+                      _ConnectionHero(
+                        compact: compact,
+                        button: _PowerButton(
+                          enabled: connectEnabled,
+                          active: isConnected,
+                          onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
+                        ),
                       ),
                       if (guard != _UsageGuard.ok) ...[
                         const SizedBox(height: 8),
@@ -256,25 +261,24 @@ class V2etDashboardPage extends HookConsumerWidget {
                               context: context,
                               barrierDismissible: true,
                               builder: (ctx) {
+                                final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
+                                final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
+                                final estimatedHeight = 120.0 + (tags.length * 56.0);
+                                final maxAllowed = isMobileSheet
+                                    ? MediaQuery.of(ctx).size.height * 0.9
+                                    : MediaQuery.of(ctx).size.height * 0.82;
+                                final sheetHeight = estimatedHeight.clamp(420.0, maxAllowed);
                                 return Dialog(
                                   backgroundColor: const Color(0xFFF5F2F8),
                                   insetPadding: EdgeInsets.symmetric(
-                                    horizontal: MediaQuery.of(ctx).size.width < 700 ? 12 : 120,
-                                    vertical: MediaQuery.of(ctx).size.width < 700 ? 2 : 8,
+                                    horizontal: isMobileSheet ? 12 : 120,
+                                    vertical: isMobileSheet ? 4 : 6,
                                   ),
                                   child: Consumer(
                                     builder: (context, sheetRef, _) {
                                       final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
-                                      final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
-                                      final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
-                                      final estimatedHeight = 120.0 + (tags.length * 56.0);
-                                      final maxAllowed = isMobileSheet
-                                          ? MediaQuery.of(ctx).size.height * 0.55
-                                          : MediaQuery.of(ctx).size.height * 0.42;
-                                      final sheetHeight = estimatedHeight.clamp(260.0, maxAllowed);
                                       final modalLink = <String, int?>{...linkOverrides.value};
                                       final modalLinkLoading = <String>{...linkLoading.value};
-
                                       return StatefulBuilder(
                                         builder: (context, setModalState) {
                                           final entries = _buildNodeEntries(
@@ -283,143 +287,136 @@ class V2etDashboardPage extends HookConsumerWidget {
                                             linkOverrides: modalLink,
                                             zh: zh,
                                           );
-                                          return SafeArea(
-                                            child: Center(
-                                              child: ConstrainedBox(
-                                                constraints: BoxConstraints(maxWidth: maxWidth),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-                                                  child: SizedBox(
-                                                    height: sheetHeight,
-                                                    child: Column(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                          return ConstrainedBox(
+                                            constraints: BoxConstraints(maxWidth: maxWidth),
+                                            child: Padding(
+                                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+                                              child: SizedBox(
+                                                height: sheetHeight,
+                                                child: Column(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
                                                       children: [
-                                                        Row(
-                                                          children: [
-                                                            Text(
-                                                              tr('选择节点', 'Select Node'),
-                                                              style: const TextStyle(
-                                                                fontWeight: FontWeight.w700,
-                                                                fontSize: 17,
-                                                              ),
-                                                            ),
-                                                            const Spacer(),
-                                                            OutlinedButton.icon(
-                                                              onPressed: () {
-                                                                modalLink.clear();
-                                                                modalLinkLoading.clear();
-                                                                linkOverrides.value = {};
-                                                                linkLoading.value = {};
-                                                                sheetRef.invalidate(proxiesOverviewNotifierProvider);
-                                                                setModalState(() {});
-                                                                showV2etNotice(
-                                                                  context,
-                                                                  tr('线路列表已刷新', 'Routes refreshed'),
-                                                                  duration: const Duration(seconds: 1),
-                                                                );
-                                                              },
-                                                              icon: const Icon(Icons.refresh_rounded, size: 15),
-                                                              label: Text(tr('刷新线路', 'Refresh routes')),
-                                                            ),
-                                                          ],
+                                                        Text(
+                                                          tr('选择节点', 'Select Node'),
+                                                          style: const TextStyle(
+                                                            fontWeight: FontWeight.w700,
+                                                            fontSize: 17,
+                                                          ),
                                                         ),
-                                                        const SizedBox(height: 4),
-                                                        Expanded(
-                                                          child: guard == _UsageGuard.expired
-                                                              ? Center(
-                                                                  child: Column(
-                                                                    mainAxisSize: MainAxisSize.min,
-                                                                    children: [
-                                                                      Text(
-                                                                        tr(
-                                                                          '套餐已到期，请续费后查看可用线路',
-                                                                          'Plan expired. Renew to view nodes',
-                                                                        ),
-                                                                        style: const TextStyle(
-                                                                          color: Color(0xFFC62828),
-                                                                          fontWeight: FontWeight.w700,
-                                                                        ),
-                                                                      ),
-                                                                      const SizedBox(height: 10),
-                                                                      FilledButton.tonalIcon(
-                                                                        onPressed: () {
-                                                                          Navigator.of(ctx).pop();
-                                                                          _openRenewDialog(context);
-                                                                        },
-                                                                        icon: const Icon(
-                                                                          Icons.shopping_bag_rounded,
-                                                                          size: 18,
-                                                                        ),
-                                                                        label: Text(tr('去续费', 'Renew now')),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                )
-                                                              : ListView.separated(
-                                                                  itemCount: entries.length,
-                                                                  separatorBuilder: (_, _) => const Divider(height: 1),
-                                                                  itemBuilder: (_, i) {
-                                                                    final item = entries[i];
-                                                                    final linkBusy = modalLinkLoading.contains(item.id);
-                                                                    return ListTile(
-                                                                      dense: true,
-                                                                      leading: Text(
-                                                                        item.flag,
-                                                                        style: const TextStyle(fontSize: 20),
-                                                                      ),
-                                                                      title: Text(item.tag),
-                                                                      trailing: Row(
-                                                                        mainAxisSize: MainAxisSize.min,
-                                                                        children: [
-                                                                          if (selectedNode.value == item.selectTag) ...[
-                                                                            const Icon(
-                                                                              Icons.check_rounded,
-                                                                              color: Color(0xFF5A3D89),
-                                                                              size: 20,
-                                                                            ),
-                                                                            const SizedBox(width: 8),
-                                                                          ],
-                                                                          _LatencyAction(
-                                                                            icon: Icons.bolt_rounded,
-                                                                            loading: linkBusy,
-                                                                            valueMs: item.linkMs,
-                                                                            timeoutText: tr('超时', 'timeout'),
-                                                                            onTap: () async {
-                                                                              modalLinkLoading.add(item.id);
-                                                                              setModalState(() {});
-                                                                              try {
-                                                                                final tested = await _runLightningProbe(
-                                                                                  sheetRef,
-                                                                                  item: item,
-                                                                                  nodeTargets: nodeTargets,
-                                                                                  currentGroup: group,
-                                                                                );
-                                                                                modalLink[item.id] =
-                                                                                    tested == null || tested <= 0
-                                                                                    ? 65535
-                                                                                    : tested;
-                                                                                linkOverrides.value = {...modalLink};
-                                                                              } finally {
-                                                                                modalLinkLoading.remove(item.id);
-                                                                                linkLoading.value = {
-                                                                                  ...modalLinkLoading,
-                                                                                };
-                                                                                setModalState(() {});
-                                                                              }
-                                                                            },
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                      onTap: () =>
-                                                                          Navigator.of(ctx).pop(item.selectTag),
-                                                                    );
-                                                                  },
-                                                                ),
+                                                        const Spacer(),
+                                                        OutlinedButton.icon(
+                                                          onPressed: () {
+                                                            modalLink.clear();
+                                                            modalLinkLoading.clear();
+                                                            linkOverrides.value = {};
+                                                            linkLoading.value = {};
+                                                            sheetRef.invalidate(proxiesOverviewNotifierProvider);
+                                                            setModalState(() {});
+                                                            showV2etNotice(
+                                                              context,
+                                                              tr('线路列表已刷新', 'Routes refreshed'),
+                                                              duration: const Duration(seconds: 1),
+                                                            );
+                                                          },
+                                                          icon: const Icon(Icons.refresh_rounded, size: 15),
+                                                          label: Text(tr('刷新线路', 'Refresh routes')),
                                                         ),
                                                       ],
                                                     ),
-                                                  ),
+                                                    const SizedBox(height: 4),
+                                                    Expanded(
+                                                      child: guard == _UsageGuard.expired
+                                                          ? Center(
+                                                              child: Column(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  Text(
+                                                                    tr(
+                                                                      '套餐已到期，请续费后查看可用线路',
+                                                                      'Plan expired. Renew to view nodes',
+                                                                    ),
+                                                                    style: const TextStyle(
+                                                                      color: Color(0xFFC62828),
+                                                                      fontWeight: FontWeight.w700,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(height: 10),
+                                                                  FilledButton.tonalIcon(
+                                                                    onPressed: () {
+                                                                      Navigator.of(ctx).pop();
+                                                                      _openRenewDialog(context);
+                                                                    },
+                                                                    icon: const Icon(
+                                                                      Icons.shopping_bag_rounded,
+                                                                      size: 18,
+                                                                    ),
+                                                                    label: Text(tr('去续费', 'Renew now')),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            )
+                                                          : ListView.separated(
+                                                              itemCount: entries.length,
+                                                              separatorBuilder: (_, _) => const Divider(height: 1),
+                                                              itemBuilder: (_, i) {
+                                                                final item = entries[i];
+                                                                final linkBusy = modalLinkLoading.contains(item.id);
+                                                                return ListTile(
+                                                                  dense: true,
+                                                                  leading: Text(
+                                                                    item.flag,
+                                                                    style: const TextStyle(fontSize: 20),
+                                                                  ),
+                                                                  title: Text(item.tag),
+                                                                  trailing: Row(
+                                                                    mainAxisSize: MainAxisSize.min,
+                                                                    children: [
+                                                                      if (selectedNode.value == item.selectTag) ...[
+                                                                        const Icon(
+                                                                          Icons.check_rounded,
+                                                                          color: Color(0xFF5A3D89),
+                                                                          size: 20,
+                                                                        ),
+                                                                        const SizedBox(width: 8),
+                                                                      ],
+                                                                      _LatencyAction(
+                                                                        icon: Icons.bolt_rounded,
+                                                                        loading: linkBusy,
+                                                                        valueMs: item.linkMs,
+                                                                        timeoutText: tr('超时', 'timeout'),
+                                                                        onTap: () async {
+                                                                          modalLinkLoading.add(item.id);
+                                                                          setModalState(() {});
+                                                                          try {
+                                                                            final tested = await _runLightningProbe(
+                                                                              sheetRef,
+                                                                              item: item,
+                                                                              nodeTargets: nodeTargets,
+                                                                              currentGroup: group,
+                                                                            );
+                                                                            modalLink[item.id] =
+                                                                                tested == null || tested <= 0
+                                                                                ? 65535
+                                                                                : tested;
+                                                                            linkOverrides.value = {...modalLink};
+                                                                          } finally {
+                                                                            modalLinkLoading.remove(item.id);
+                                                                            linkLoading.value = {...modalLinkLoading};
+                                                                            setModalState(() {});
+                                                                          }
+                                                                        },
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                  onTap: () => Navigator.of(ctx).pop(item.selectTag),
+                                                                );
+                                                              },
+                                                            ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             ),
@@ -550,6 +547,33 @@ class V2etDashboardPage extends HookConsumerWidget {
     return null;
   }
 
+  Future<int?> _runLinkProbe(
+    WidgetRef ref, {
+    required String groupTag,
+    required String outboundTag,
+    required String? restoreTag,
+  }) async {
+    final repo = ref.read(proxyRepositoryProvider);
+    final selected = await repo.selectProxy(groupTag, outboundTag).run();
+    final canProbe = selected.match((_) => false, (_) => true);
+    if (!canProbe) {
+      return 65535;
+    }
+
+    final timer = Stopwatch()..start();
+    try {
+      final res = await repo.getCurrentIpInfo(CancelToken()).run().timeout(const Duration(seconds: 8));
+      return res.match((_) => 65535, (_) => timer.elapsedMilliseconds);
+    } catch (_) {
+      return 65535;
+    } finally {
+      timer.stop();
+      if (restoreTag != null && restoreTag.isNotEmpty && restoreTag != outboundTag) {
+        await repo.selectProxy(groupTag, restoreTag).run();
+      }
+    }
+  }
+
   List<_NodeEntry> _buildNodeEntries(
     List<String> tags,
     dynamic proxyGroup, {
@@ -663,17 +687,14 @@ class V2etDashboardPage extends HookConsumerWidget {
     required Map<String, _NodeTarget> nodeTargets,
     required dynamic currentGroup,
   }) async {
-    var target = nodeTargets[item.testTag];
-    if (target == null && item.isSpecial) {
-      final selected = _readSelectedTag(currentGroup);
-      if (selected != null && selected.isNotEmpty) {
-        target = nodeTargets[selected];
-      }
+    final connected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
+    if (!connected) {
+      return 65535;
     }
-    if (target != null) {
-      return _runTcpProbe(target);
-    }
-    return 65535;
+
+    final groupTag = _readGroupTag(currentGroup) ?? 'select';
+    final restoreTag = _readSelectedTag(currentGroup);
+    return _runLinkProbe(ref, groupTag: groupTag, outboundTag: item.testTag, restoreTag: restoreTag);
   }
 
   Future<void> _openRenewDialog(BuildContext context) async {
@@ -932,6 +953,84 @@ class _LatencyAction extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ConnectionHero extends StatelessWidget {
+  const _ConnectionHero({required this.compact, required this.button});
+
+  final bool compact;
+  final Widget button;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = compact ? 340.0 : 620.0;
+    final height = compact ? 190.0 : 240.0;
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(child: CustomPaint(painter: _WorldMapSketchPainter())),
+          ),
+          button,
+        ],
+      ),
+    );
+  }
+}
+
+class _WorldMapSketchPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFCBC6D6).withValues(alpha: 0.42)
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+
+    // North America
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.03, size.height * 0.30, size.width * 0.24, size.height * 0.24),
+        const Radius.circular(24),
+      ),
+    );
+    // South America
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.20, size.height * 0.56, size.width * 0.09, size.height * 0.26),
+        const Radius.circular(20),
+      ),
+    );
+    // Europe + Africa
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.43, size.height * 0.30, size.width * 0.14, size.height * 0.44),
+        const Radius.circular(26),
+      ),
+    );
+    // Asia
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.58, size.height * 0.26, size.width * 0.31, size.height * 0.30),
+        const Radius.circular(30),
+      ),
+    );
+    // Australia
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.82, size.height * 0.62, size.width * 0.13, size.height * 0.14),
+        const Radius.circular(20),
+      ),
+    );
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _Card extends StatelessWidget {

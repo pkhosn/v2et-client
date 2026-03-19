@@ -6,6 +6,7 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
+import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 
 class V2etStorePage extends ConsumerStatefulWidget {
   const V2etStorePage({super.key});
@@ -89,7 +90,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 1180
+                  final columns = constraints.maxWidth >= 980
                       ? 3
                       : constraints.maxWidth >= 760
                       ? 2
@@ -204,9 +205,7 @@ class _OfferCard extends ConsumerWidget {
                       final V2boardSession? session = ref.read(v2etSessionProvider).valueOrNull;
                       if (session == null || !session.hasToken || offer.id == null) {
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(tr('请先登录后购买', 'Please login before purchase'))));
+                        showV2etNotice(context, tr('请先登录后购买', 'Please login before purchase'), error: true);
                         return;
                       }
 
@@ -321,9 +320,7 @@ class _OfferCard extends ConsumerWidget {
     final methods = await ref.read(v2etPortalApiProvider).fetchPaymentMethods(session);
     if (!context.mounted) return null;
     if (methods.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(tr('暂无可用支付方式', 'No payment method available'))));
+      showV2etNotice(context, tr('暂无可用支付方式', 'No payment method available'), error: true);
       return null;
     }
     return showModalBottomSheet<V2etPaymentMethod>(
@@ -358,7 +355,7 @@ class _OfferCard extends ConsumerWidget {
       if (!context.mounted) return;
 
       if (checkout.type == -1) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('订单已完成', 'Order completed'))));
+        showV2etNotice(context, tr('订单已完成', 'Order completed'));
         ref.invalidate(v2etOrdersProvider);
         return;
       }
@@ -366,9 +363,7 @@ class _OfferCard extends ConsumerWidget {
       await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(tr('下单失败: ', 'Checkout failed: ') + e.toString())));
+      showV2etNotice(context, tr('下单失败: ', 'Checkout failed: ') + e.toString(), error: true);
     }
   }
 
@@ -421,20 +416,14 @@ class _OfferCard extends ConsumerWidget {
                     Navigator.of(dialogContext).pop();
                   }
                   if (context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(tr('支付成功，套餐已生效', 'Payment successful, plan activated'))));
+                    showV2etNotice(context, tr('支付成功，套餐已生效', 'Payment successful, plan activated'));
                   }
                 } else if (innerContext.mounted) {
-                  ScaffoldMessenger.of(
-                    innerContext,
-                  ).showSnackBar(SnackBar(content: Text(tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'))));
+                  showV2etNotice(innerContext, tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'));
                 }
               } catch (e) {
                 if (innerContext.mounted) {
-                  ScaffoldMessenger.of(
-                    innerContext,
-                  ).showSnackBar(SnackBar(content: Text(tr('查询订单失败: ', 'Order check failed: ') + e.toString())));
+                  showV2etNotice(innerContext, tr('查询订单失败: ', 'Order check failed: ') + e.toString(), error: true);
                 }
               } finally {
                 if (dialogContext.mounted) {
@@ -483,9 +472,7 @@ class _OfferCard extends ConsumerWidget {
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: raw));
                       if (!innerContext.mounted) return;
-                      ScaffoldMessenger.of(
-                        innerContext,
-                      ).showSnackBar(SnackBar(content: Text(tr('支付信息已复制', 'Payment info copied'))));
+                      showV2etNotice(innerContext, tr('支付信息已复制', 'Payment info copied'));
                     },
                     child: Text(tr('复制', 'Copy')),
                   ),

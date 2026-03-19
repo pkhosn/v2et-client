@@ -9,7 +9,8 @@ final v2etPortalApiProvider = Provider<V2etPortalApi>((ref) {
 });
 
 final v2etNoticesProvider = FutureProvider<List<V2etNotice>>((ref) async {
-  final session = await ref.watch(v2etSessionProvider.future);
+  var session = await ref.watch(v2etSessionProvider.future);
+  session ??= await ref.read(v2etRepositoryProvider).restoreSession();
   if (session == null || !session.hasToken) {
     return const [V2etNotice(title: '系统公告', content: '请先登录后同步公告。')];
   }
@@ -28,31 +29,33 @@ final v2etBannersProvider = Provider<List<V2etBanner>>((ref) {
   final runtime = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
   final remoteBanners = runtime?.banners ?? const [];
   if (remoteBanners.isNotEmpty) {
-    return remoteBanners
-        .map(
-          (b) => V2etBanner(title: b.title, imageUrl: b.imageUrl, targetUrl: b.targetUrl),
-        )
-        .toList();
+    return remoteBanners.map((b) => V2etBanner(title: b.title, imageUrl: b.imageUrl, targetUrl: b.targetUrl)).toList();
   }
-  return const [
-    V2etBanner(title: '新品套餐', imageUrl: 'https://dummyimage.com/1200x360/ece8f5/5b3f88&text=V2ET+Banner'),
-  ];
+  return const [V2etBanner(title: '新品套餐', imageUrl: 'https://dummyimage.com/1200x360/ece8f5/5b3f88&text=V2ET+Banner')];
 });
 
 final v2etStoreOffersProvider = FutureProvider<List<V2etStoreOffer>>((ref) async {
-  final session = await ref.watch(v2etSessionProvider.future);
+  var session = await ref.watch(v2etSessionProvider.future);
+  session ??= await ref.read(v2etRepositoryProvider).restoreSession();
   if (session == null || !session.hasToken) {
     return const [];
   }
   try {
     return await ref.watch(v2etPortalApiProvider).fetchPlans(session);
   } catch (_) {
-    return const [];
+    final restored = await ref.read(v2etRepositoryProvider).restoreSession();
+    if (restored == null || !restored.hasToken) return const [];
+    try {
+      return await ref.watch(v2etPortalApiProvider).fetchPlans(restored);
+    } catch (_) {
+      return const [];
+    }
   }
 });
 
 final v2etCountersProvider = FutureProvider<Map<String, int>>((ref) async {
-  final session = await ref.watch(v2etSessionProvider.future);
+  var session = await ref.watch(v2etSessionProvider.future);
+  session ??= await ref.read(v2etRepositoryProvider).restoreSession();
   if (session == null || !session.hasToken) {
     return const {'orders': 0, 'tickets': 0};
   }
@@ -76,7 +79,8 @@ final v2etSupportEntriesProvider = FutureProvider<List<V2etSupportEntry>>((ref) 
 });
 
 final v2etOrdersProvider = FutureProvider<List<V2etOrderRecord>>((ref) async {
-  final session = await ref.watch(v2etSessionProvider.future);
+  var session = await ref.watch(v2etSessionProvider.future);
+  session ??= await ref.read(v2etRepositoryProvider).restoreSession();
   if (session == null || !session.hasToken) return const [];
   try {
     return await ref.watch(v2etPortalApiProvider).fetchOrders(session);
@@ -86,7 +90,8 @@ final v2etOrdersProvider = FutureProvider<List<V2etOrderRecord>>((ref) async {
 });
 
 final v2etTrafficLogsProvider = FutureProvider<List<V2etTrafficRecord>>((ref) async {
-  final session = await ref.watch(v2etSessionProvider.future);
+  var session = await ref.watch(v2etSessionProvider.future);
+  session ??= await ref.read(v2etRepositoryProvider).restoreSession();
   if (session == null || !session.hasToken) return const [];
   try {
     return await ref.watch(v2etPortalApiProvider).fetchTrafficLogs(session);
@@ -96,7 +101,8 @@ final v2etTrafficLogsProvider = FutureProvider<List<V2etTrafficRecord>>((ref) as
 });
 
 final v2etInviteInfoProvider = FutureProvider<V2etInviteInfo?>((ref) async {
-  final session = await ref.watch(v2etSessionProvider.future);
+  var session = await ref.watch(v2etSessionProvider.future);
+  session ??= await ref.read(v2etRepositoryProvider).restoreSession();
   if (session == null || !session.hasToken) return null;
   try {
     return await ref.watch(v2etPortalApiProvider).fetchInviteInfo(session);

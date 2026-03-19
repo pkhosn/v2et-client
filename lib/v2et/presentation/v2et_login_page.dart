@@ -14,6 +14,7 @@ import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
 import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
+import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 enum _AuthMode { login, register, forgot }
@@ -108,11 +109,7 @@ class V2etLoginPage extends HookConsumerWidget {
           }),
         );
         if (!context.mounted) return;
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(tr('登录成功', 'Login success')), duration: const Duration(seconds: 1)));
-        }
+        if (context.mounted) showV2etNotice(context, tr('登录成功', 'Login success'), duration: const Duration(seconds: 1));
         context.go('/home');
       } catch (e) {
         final message = _friendlyLoginError(e, zh);
@@ -569,23 +566,17 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                           final builtEmail = _composeEmail();
                           if (builtEmail.isEmpty) return;
                           if (!_validateEmailWhitelist(builtEmail)) {
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))));
+                            showV2etNotice(context, tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'), error: true);
                             return;
                           }
                           setState(() => sendingCode = true);
                           try {
                             await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: builtEmail);
                             if (!mounted) return;
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
+                            showV2etNotice(context, tr('验证码已发送', 'Verification code sent'));
                           } catch (e) {
                             if (!mounted) return;
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
+                            showV2etNotice(context, tr('发送失败: ', 'Failed: ') + e.toString(), error: true);
                           } finally {
                             if (mounted) setState(() => sendingCode = false);
                           }
@@ -605,9 +596,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                       final p = password.text;
                       if (e.isEmpty || p.isEmpty) return;
                       if (!_validateEmailWhitelist(e)) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'))));
+                        showV2etNotice(context, tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'), error: true);
                         return;
                       }
                       if (widget.config.requireEmailVerify && emailCode.text.trim().isEmpty) return;
@@ -623,14 +612,10 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                         );
                         if (!mounted) return;
                         widget.onDone();
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(tr('注册成功，请登录', 'Register success, please login'))));
+                        showV2etNotice(context, tr('注册成功，请登录', 'Register success, please login'));
                       } catch (e) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(tr('注册失败: ', 'Register failed: ') + e.toString())));
+                        showV2etNotice(context, tr('注册失败: ', 'Register failed: ') + e.toString(), error: true);
                       } finally {
                         if (mounted) setState(() => submitting = false);
                       }
@@ -710,14 +695,10 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
                         try {
                           await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: e);
                           if (!mounted) return;
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(tr('验证码已发送', 'Verification code sent'))));
+                          showV2etNotice(context, tr('验证码已发送', 'Verification code sent'));
                         } catch (e) {
                           if (!mounted) return;
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(tr('发送失败: ', 'Failed: ') + e.toString())));
+                          showV2etNotice(context, tr('发送失败: ', 'Failed: ') + e.toString(), error: true);
                         } finally {
                           if (mounted) setState(() => sendingCode = false);
                         }
@@ -747,14 +728,10 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
                         await widget.api.resetPassword(baseUrl: widget.baseUrl, email: e, password: p, emailCode: c);
                         if (!mounted) return;
                         widget.onDone();
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(tr('重置成功，请登录', 'Reset success, please login'))));
+                        showV2etNotice(context, tr('重置成功，请登录', 'Reset success, please login'));
                       } catch (e) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(tr('重置失败: ', 'Reset failed: ') + e.toString())));
+                        showV2etNotice(context, tr('重置失败: ', 'Reset failed: ') + e.toString(), error: true);
                       } finally {
                         if (mounted) setState(() => submitting = false);
                       }

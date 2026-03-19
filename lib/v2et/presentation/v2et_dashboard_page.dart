@@ -15,6 +15,7 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
+import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -162,8 +163,10 @@ class V2etDashboardPage extends HookConsumerWidget {
                                   builder: (context, sheetRef, _) {
                                     final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
                                     final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
-                                    final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 700.0;
-                                    final sheetHeight = MediaQuery.of(ctx).size.height * (isMobileSheet ? 0.66 : 0.56);
+                                    final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
+                                    final sheetHeight = isMobileSheet
+                                        ? MediaQuery.of(ctx).size.height * 0.66
+                                        : (MediaQuery.of(ctx).size.height * 0.52).clamp(360.0, 460.0);
                                     final modalPing = <String, int?>{...pingOverrides.value};
                                     final modalLink = <String, int?>{...linkOverrides.value};
                                     final modalPingLoading = <String>{...pingLoading.value};
@@ -212,11 +215,10 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                               linkLoading.value = {};
                                                               sheetRef.invalidate(proxiesOverviewNotifierProvider);
                                                               setModalState(() {});
-                                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                                SnackBar(
-                                                                  content: Text(tr('线路列表已刷新', 'Routes refreshed')),
-                                                                  duration: const Duration(seconds: 1),
-                                                                ),
+                                                              showV2etNotice(
+                                                                context,
+                                                                tr('线路列表已刷新', 'Routes refreshed'),
+                                                                duration: const Duration(seconds: 1),
                                                               );
                                                             },
                                                             icon: const Icon(Icons.refresh_rounded, size: 15),
@@ -252,11 +254,20 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                       modalPingLoading.add(item.id);
                                                                       setModalState(() {});
                                                                       try {
+                                                                        final groupTag =
+                                                                            _readGroupTag(group) ?? 'select';
+                                                                        final restoreTag = _readSelectedTag(group);
+                                                                        final wasConnected =
+                                                                            await _prepareTestConnection(sheetRef);
+                                                                        await sheetRef
+                                                                            .read(proxyRepositoryProvider)
+                                                                            .selectProxy(groupTag, item.testTag)
+                                                                            .run();
                                                                         await sheetRef
                                                                             .read(
                                                                               proxiesOverviewNotifierProvider.notifier,
                                                                             )
-                                                                            .urlTest(item.testTag);
+                                                                            .urlTest(groupTag);
                                                                         final refreshed = sheetRef
                                                                             .read(proxiesOverviewNotifierProvider)
                                                                             .valueOrNull;
@@ -267,6 +278,14 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                             ? 65535
                                                                             : tested;
                                                                         pingOverrides.value = {...modalPing};
+                                                                        if (restoreTag != null &&
+                                                                            restoreTag.isNotEmpty) {
+                                                                          await sheetRef
+                                                                              .read(proxyRepositoryProvider)
+                                                                              .selectProxy(groupTag, restoreTag)
+                                                                              .run();
+                                                                        }
+                                                                        await _restoreAfterTest(sheetRef, wasConnected);
                                                                       } finally {
                                                                         modalPingLoading.remove(item.id);
                                                                         pingLoading.value = {...modalPingLoading};
@@ -286,6 +305,8 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                       modalLinkLoading.add(item.id);
                                                                       setModalState(() {});
                                                                       try {
+                                                                        final wasConnected =
+                                                                            await _prepareTestConnection(sheetRef);
                                                                         final tested = await _runLinkProbe(
                                                                           sheetRef,
                                                                           groupTag: groupTag,
@@ -297,6 +318,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                             ? 65535
                                                                             : tested;
                                                                         linkOverrides.value = {...modalLink};
+                                                                        await _restoreAfterTest(sheetRef, wasConnected);
                                                                       } finally {
                                                                         modalLinkLoading.remove(item.id);
                                                                         linkLoading.value = {...modalLinkLoading};
@@ -439,6 +461,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final entries = <_NodeEntry>[];
     final autoLabel = zh ? '自动选择' : 'Auto Select';
     final failoverLabel = zh ? '故障转移' : 'Failover';
+    final currentGroupTag = _readGroupTag(proxyGroup) ?? 'select';
     final autoSelectTag = resolveTag([autoLabel, 'auto select', 'auto', 'urltest', 'url-test', 'select']);
     final failoverTag = resolveTag([failoverLabel, 'failover', 'fallback', '故障转移', '故障转移节点']);
 
@@ -447,8 +470,8 @@ class V2etDashboardPage extends HookConsumerWidget {
         id: '__auto__',
         tag: autoLabel,
         flag: '⚡',
-        selectTag: autoSelectTag ?? autoLabel,
-        testTag: autoSelectTag ?? autoLabel,
+        selectTag: autoSelectTag ?? currentGroupTag,
+        testTag: autoSelectTag ?? currentGroupTag,
         pingMs: pingOverrides['__auto__'],
         linkMs: linkOverrides['__auto__'],
         isSpecial: true,
@@ -459,8 +482,8 @@ class V2etDashboardPage extends HookConsumerWidget {
         id: '__failover__',
         tag: failoverLabel,
         flag: '🛡️',
-        selectTag: failoverTag ?? failoverLabel,
-        testTag: failoverTag ?? failoverLabel,
+        selectTag: failoverTag ?? currentGroupTag,
+        testTag: failoverTag ?? currentGroupTag,
         pingMs: pingOverrides['__failover__'],
         linkMs: linkOverrides['__failover__'],
         isSpecial: true,
@@ -534,7 +557,7 @@ class V2etDashboardPage extends HookConsumerWidget {
 
     final timer = Stopwatch()..start();
     try {
-      final res = await repo.getCurrentIpInfo(CancelToken()).run();
+      final res = await repo.getCurrentIpInfo(CancelToken()).run().timeout(const Duration(seconds: 8));
       return res.match((_) => null, (_) => timer.elapsedMilliseconds);
     } finally {
       timer.stop();
@@ -542,6 +565,23 @@ class V2etDashboardPage extends HookConsumerWidget {
         await repo.selectProxy(groupTag, restoreTag).run();
       }
     }
+  }
+
+  Future<bool> _prepareTestConnection(WidgetRef ref) async {
+    final beforeConnected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
+    if (beforeConnected) return true;
+    await ref.read(connectionNotifierProvider.notifier).mayConnect();
+    for (var i = 0; i < 16; i++) {
+      final connected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
+      if (connected) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+    return false;
+  }
+
+  Future<void> _restoreAfterTest(WidgetRef ref, bool wasConnected) async {
+    if (wasConnected) return;
+    await ref.read(connectionNotifierProvider.notifier).abortConnection();
   }
 
   String _flagForTag(String tag) {

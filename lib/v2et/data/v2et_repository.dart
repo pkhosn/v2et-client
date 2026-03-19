@@ -1,6 +1,7 @@
 import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_credentials_store.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
+import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2board_subscription.dart';
 
 abstract interface class V2etRepository {
@@ -11,6 +12,8 @@ abstract interface class V2etRepository {
   Future<V2boardCredentials?> readSavedCredentials();
 
   Future<void> logout();
+
+  Future<V2boardSession?> restoreSession();
 
   V2boardSubscription? readLastSubscription();
 }
@@ -53,6 +56,15 @@ class V2etRepositoryImpl implements V2etRepository {
   }
 
   @override
+  Future<V2boardSession?> restoreSession() async {
+    final credentials = await _credentialsStore.readCredentials();
+    if (credentials == null) return null;
+    final session = await _v2boardApi.login(credentials);
+    await _credentialsStore.saveSession(session);
+    return session;
+  }
+
+  @override
   V2boardSubscription? readLastSubscription() {
     return _credentialsStore.readLastSubscription();
   }
@@ -74,6 +86,9 @@ class V2etNoopRepository implements V2etRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<V2boardSession?> restoreSession() async => null;
 
   @override
   V2boardSubscription? readLastSubscription() => null;

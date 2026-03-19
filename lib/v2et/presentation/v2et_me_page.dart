@@ -9,6 +9,7 @@ import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
+import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -80,9 +81,7 @@ class V2etMePage extends HookConsumerWidget {
           break;
         case 'support':
           if (supportUri == null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(tr('未配置客服入口', 'Support is not configured'))));
+            showV2etNotice(context, tr('未配置客服入口', 'Support is not configured'), error: true);
             break;
           }
           await launchUrl(supportUri, mode: LaunchMode.externalApplication);
@@ -109,9 +108,7 @@ class V2etMePage extends HookConsumerWidget {
           );
           break;
         case 'tickets':
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(tr('工单模块开发中', 'Ticket page is under development'))));
+          showV2etNotice(context, tr('工单模块开发中', 'Ticket page is under development'));
           break;
         case 'logout':
           final shouldLogout = await showDialog<bool>(
@@ -131,7 +128,7 @@ class V2etMePage extends HookConsumerWidget {
           ref.invalidate(v2etSessionProvider);
           ref.invalidate(v2etNoticesProvider);
           if (context.mounted) {
-            context.go('/v2et-login');
+            context.go('/home');
           }
           break;
       }
@@ -185,8 +182,6 @@ class V2etMePage extends HookConsumerWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.alternate_email_rounded, size: 16, color: Color(0xFF5A5563)),
-                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           (accountEmail == null || accountEmail.isEmpty)
@@ -197,6 +192,7 @@ class V2etMePage extends HookConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 4),
                       IconButton(
                         visualDensity: VisualDensity.compact,
                         onPressed: (accountEmail == null || accountEmail.isEmpty)
@@ -204,9 +200,7 @@ class V2etMePage extends HookConsumerWidget {
                             : () async {
                                 await Clipboard.setData(ClipboardData(text: accountEmail));
                                 if (!context.mounted) return;
-                                ScaffoldMessenger.of(
-                                  context,
-                                ).showSnackBar(SnackBar(content: Text(tr('账号已复制', 'Account copied'))));
+                                showV2etNotice(context, tr('账号已复制', 'Account copied'));
                               },
                         icon: const Icon(Icons.copy_rounded, size: 18),
                         tooltip: tr('复制账号', 'Copy account'),
@@ -517,9 +511,7 @@ class _InviteDialog extends ConsumerWidget {
                                   onPressed: () async {
                                     await Clipboard.setData(ClipboardData(text: code));
                                     if (!context.mounted) return;
-                                    ScaffoldMessenger.of(
-                                      context,
-                                    ).showSnackBar(SnackBar(content: Text(tr('邀请码已复制', 'Invite code copied'))));
+                                    showV2etNotice(context, tr('邀请码已复制', 'Invite code copied'));
                                   },
                                 ),
                               );
@@ -664,19 +656,13 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
                     if (!mounted) return;
                     if (ok) {
                       Navigator.of(context).pop();
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(tr('兑换成功，已自动生效', 'Redeemed successfully'))));
+                      showV2etNotice(context, tr('兑换成功，已自动生效', 'Redeemed successfully'));
                     } else {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(tr('兑换未完成，请检查优惠力度', 'Not fully discounted'))));
+                      showV2etNotice(context, tr('兑换未完成，请检查优惠力度', 'Not fully discounted'));
                     }
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(tr('兑换失败: ', 'Redeem failed: ') + e.toString())));
+                    showV2etNotice(context, tr('兑换失败: ', 'Redeem failed: ') + e.toString(), error: true);
                   } finally {
                     if (mounted) setState(() => submitting = false);
                   }

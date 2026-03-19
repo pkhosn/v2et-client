@@ -115,7 +115,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                   backgroundColor: const Color(0xFF5A3D89),
                   foregroundColor: Colors.white,
                   onPressed: () async {
-                    await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+                    var opened = await launchUrl(supportUri, mode: LaunchMode.inAppWebView);
+                    if (!opened) {
+                      opened = await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+                    }
                   },
                   child: const Icon(Icons.support_agent_rounded),
                 ),

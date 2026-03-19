@@ -79,7 +79,7 @@ class _OfferCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final description = _descriptionText(offer.features);
+    final description = _descriptionText(offer);
     final allPrices = _priceEntries(offer);
     final mainPrice = allPrices.isEmpty ? null : allPrices.first;
 
@@ -135,12 +135,7 @@ class _OfferCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  description,
-                  style: const TextStyle(color: Color(0xFF2D2737), fontSize: 15, height: 1.5),
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(description, style: const TextStyle(color: Color(0xFF2D2737), fontSize: 15, height: 1.5)),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -232,16 +227,38 @@ class _OfferCard extends ConsumerWidget {
     };
   }
 
-  String _descriptionText(List<String> source) {
-    if (source.isEmpty) {
+  String _descriptionText(V2etStoreOffer offer) {
+    final lines = <String>[];
+    for (final item in offer.features) {
+      final text = item.replaceFirst(RegExp(r'^(-|x\s+|✗\s*)'), '').trim();
+      if (text.isNotEmpty) {
+        lines.add(text);
+      }
+    }
+    if (offer.traffic != null && offer.traffic! > 0) {
+      lines.add(tr('流量: ', 'Traffic: ') + _humanBytes(offer.traffic!));
+    }
+    if (offer.speed != null && offer.speed!.trim().isNotEmpty) {
+      lines.add(tr('速率: ', 'Speed: ') + offer.speed!.trim());
+    }
+    if (offer.deviceLimit != null) {
+      lines.add(tr('设备限制: ', 'Device limit: ') + '${offer.deviceLimit}${tr('台', '')}');
+    }
+    if (lines.isEmpty) {
       return tr('高速稳定网络服务，适配多终端场景。', 'Fast and stable network service for multi-device usage.');
     }
-    final lines = source
-        .map((e) => e.replaceFirst(RegExp(r'^(-|x\s+|✗\s*)'), '').trim())
-        .where((e) => e.isNotEmpty)
-        .take(4)
-        .toList();
     return lines.join('\n');
+  }
+
+  String _humanBytes(int value) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var unit = 0;
+    var size = value.toDouble();
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit++;
+    }
+    return '${size.toStringAsFixed(size >= 100 ? 0 : 2)} ${units[unit]}';
   }
 
   Future<String?> _pickPeriod(BuildContext context, List<(String, double)> prices) async {

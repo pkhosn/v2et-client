@@ -52,7 +52,7 @@ class V2etRepositoryImpl implements V2etRepository {
 
   @override
   Future<void> logout() {
-    return _credentialsStore.clearAll();
+    return _credentialsStore.clearSessionOnly();
   }
 
   @override

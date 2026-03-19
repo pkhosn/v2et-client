@@ -136,6 +136,18 @@ class V2etCredentialsStore {
     await _deleteSecure(_tokenKey);
   }
 
+  Future<void> clearSessionOnly() async {
+    await _preferences.remove(_tokenKey);
+    await _preferences.remove(_tokenAtKey);
+    await _deleteSecure(_tokenKey);
+    await _preferences.remove(_planNameKey);
+    await _preferences.remove(_transferEnableKey);
+    await _preferences.remove(_expiredAtKey);
+    await _preferences.remove(_nodeCountKey);
+    await _preferences.remove(_subUrlKey);
+    await _preferences.remove(_subFetchedAtKey);
+  }
+
   Future<String?> _readSecure(String key) async {
     try {
       return await _secureStorage.read(key: key);

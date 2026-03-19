@@ -12,6 +12,7 @@ import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
 import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
+import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
@@ -103,6 +104,13 @@ class V2etLoginPage extends HookConsumerWidget {
         await ref.read(Preferences.enableV2etAdapter.notifier).update(true);
         final sub = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
         ref.read(v2etSessionUnlockedProvider.notifier).state = true;
+        ref.invalidate(v2etSessionProvider);
+        ref.invalidate(v2etNoticesProvider);
+        ref.invalidate(v2etStoreOffersProvider);
+        ref.invalidate(v2etCountersProvider);
+        ref.invalidate(v2etOrdersProvider);
+        ref.invalidate(v2etTrafficLogsProvider);
+        ref.invalidate(v2etInviteInfoProvider);
         unawaited(
           ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((_) {}),
         );
@@ -128,7 +136,10 @@ class V2etLoginPage extends HookConsumerWidget {
               backgroundColor: const Color(0xFF5A3D89),
               foregroundColor: Colors.white,
               onPressed: () async {
-                await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+                var opened = await launchUrl(supportUri, mode: LaunchMode.inAppWebView);
+                if (!opened) {
+                  opened = await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+                }
               },
               child: const Icon(Icons.support_agent_rounded),
             ),

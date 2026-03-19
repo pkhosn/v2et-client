@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -11,7 +11,6 @@ import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
-import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
@@ -239,11 +238,15 @@ class V2etDashboardPage extends HookConsumerWidget {
                         constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
                         child: _Card(
                           onTap: () async {
-                            var tags = await _readNodeTags(ref, activeProfile);
+                            final meta = await _readNodeMeta(ref, activeProfile);
+                            var tags = meta.tags;
+                            var nodeTargets = meta.targets;
                             if (!context.mounted) return;
                             if (tags.isEmpty && guard == _UsageGuard.ok) {
                               await _syncSubscriptionAndProfile(ref);
-                              tags = await _readNodeTags(ref, activeProfile);
+                              final refreshedMeta = await _readNodeMeta(ref, activeProfile);
+                              tags = refreshedMeta.tags;
+                              nodeTargets = refreshedMeta.targets;
                             }
                             if (tags.isEmpty && guard == _UsageGuard.ok) {
                               showV2etNotice(context, tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
@@ -257,7 +260,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                   backgroundColor: const Color(0xFFF5F2F8),
                                   insetPadding: EdgeInsets.symmetric(
                                     horizontal: MediaQuery.of(ctx).size.width < 700 ? 12 : 120,
-                                    vertical: MediaQuery.of(ctx).size.width < 700 ? 10 : 20,
+                                    vertical: MediaQuery.of(ctx).size.width < 700 ? 2 : 8,
                                   ),
                                   child: Consumer(
                                     builder: (context, sheetRef, _) {
@@ -266,8 +269,8 @@ class V2etDashboardPage extends HookConsumerWidget {
                                       final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
                                       final estimatedHeight = 120.0 + (tags.length * 56.0);
                                       final maxAllowed = isMobileSheet
-                                          ? MediaQuery.of(ctx).size.height * 0.75
-                                          : MediaQuery.of(ctx).size.height * 0.62;
+                                          ? MediaQuery.of(ctx).size.height * 0.55
+                                          : MediaQuery.of(ctx).size.height * 0.42;
                                       final sheetHeight = estimatedHeight.clamp(260.0, maxAllowed);
                                       final modalLink = <String, int?>{...linkOverrides.value};
                                       final modalLinkLoading = <String>{...linkLoading.value};
@@ -383,36 +386,20 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                             valueMs: item.linkMs,
                                                                             timeoutText: tr('超时', 'timeout'),
                                                                             onTap: () async {
-                                                                              final groupTag =
-                                                                                  _readGroupTag(group) ?? 'select';
-                                                                              final restoreTag = _readSelectedTag(
-                                                                                group,
-                                                                              );
                                                                               modalLinkLoading.add(item.id);
                                                                               setModalState(() {});
                                                                               try {
-                                                                                final wasConnected =
-                                                                                    await _prepareTestConnection(
-                                                                                      sheetRef,
-                                                                                    );
-                                                                                if (wasConnected == null) {
-                                                                                  return;
-                                                                                }
-                                                                                final tested = await _runLinkProbe(
+                                                                                final tested = await _runLightningProbe(
                                                                                   sheetRef,
-                                                                                  groupTag: groupTag,
-                                                                                  outboundTag: item.testTag,
-                                                                                  restoreTag: restoreTag,
+                                                                                  item: item,
+                                                                                  nodeTargets: nodeTargets,
+                                                                                  currentGroup: group,
                                                                                 );
                                                                                 modalLink[item.id] =
                                                                                     tested == null || tested <= 0
                                                                                     ? 65535
                                                                                     : tested;
                                                                                 linkOverrides.value = {...modalLink};
-                                                                                await _restoreAfterTest(
-                                                                                  sheetRef,
-                                                                                  wasConnected,
-                                                                                );
                                                                               } finally {
                                                                                 modalLinkLoading.remove(item.id);
                                                                                 linkLoading.value = {
@@ -512,32 +499,55 @@ class V2etDashboardPage extends HookConsumerWidget {
     } catch (_) {}
   }
 
-  Future<List<String>> _readNodeTags(WidgetRef ref, ProfileEntity? activeProfile) async {
-    if (activeProfile == null) return const [];
+  Future<_NodeMeta> _readNodeMeta(WidgetRef ref, ProfileEntity? activeProfile) async {
+    if (activeProfile == null) return const _NodeMeta(tags: [], targets: {});
     final repo = await ref.read(profileRepositoryProvider.future);
     final result = await repo.getRawConfig(activeProfile.id).run();
-    return result.match((_) => const <String>[], _extractNodeTags);
+    return result.match((_) => const _NodeMeta(tags: [], targets: {}), _extractNodeMeta);
   }
 
-  List<String> _extractNodeTags(String raw) {
+  _NodeMeta _extractNodeMeta(String raw) {
     try {
       final data = jsonDecode(raw);
-      if (data is! Map) return const [];
+      if (data is! Map) return const _NodeMeta(tags: [], targets: {});
       final outbounds = data['outbounds'];
-      if (outbounds is! List) return const [];
+      if (outbounds is! List) return const _NodeMeta(tags: [], targets: {});
       const ignoredTypes = {'selector', 'urltest', 'direct', 'block', 'dns'};
       final tags = <String>[];
+      final targets = <String, _NodeTarget>{};
       for (final item in outbounds) {
         if (item is! Map) continue;
         final type = item['type']?.toString().toLowerCase() ?? '';
         final tag = item['tag']?.toString().trim() ?? '';
         if (tag.isEmpty || ignoredTypes.contains(type)) continue;
         tags.add(tag);
+
+        String? host = item['server']?.toString().trim();
+        int? port = _parsePort(item['server_port']) ?? _parsePort(item['port']);
+        host ??= item['address']?.toString().trim();
+        if ((host == null || host.isEmpty) && item['server'] != null) {
+          final serverText = item['server'].toString().trim();
+          final idx = serverText.lastIndexOf(':');
+          if (idx > 0 && idx < serverText.length - 1) {
+            host = serverText.substring(0, idx);
+            port ??= _parsePort(serverText.substring(idx + 1));
+          }
+        }
+        if (host != null && host.isNotEmpty && port != null && port > 0 && port <= 65535) {
+          targets[tag] = _NodeTarget(host: host, port: port);
+        }
       }
-      return tags.toSet().toList();
+      return _NodeMeta(tags: tags.toSet().toList(), targets: targets);
     } catch (_) {
-      return const [];
+      return const _NodeMeta(tags: [], targets: {});
     }
+  }
+
+  int? _parsePort(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   List<_NodeEntry> _buildNodeEntries(
@@ -613,21 +623,6 @@ class V2etDashboardPage extends HookConsumerWidget {
     return entries;
   }
 
-  int? _readDelayForTag(dynamic proxyGroup, String tag) {
-    try {
-      final items = proxyGroup?.items as List<dynamic>?;
-      if (items == null) return null;
-      for (final item in items) {
-        final currentTag = item.tag?.toString().trim();
-        if (currentTag == tag) {
-          final delay = item.urlTestDelay is int ? item.urlTestDelay as int : 0;
-          return delay > 0 ? delay : 65535;
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
   String? _readGroupTag(dynamic proxyGroup) {
     try {
       final value = proxyGroup.tag?.toString().trim();
@@ -648,47 +643,37 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  Future<int?> _runLinkProbe(
-    WidgetRef ref, {
-    required String groupTag,
-    required String outboundTag,
-    required String? restoreTag,
-  }) async {
-    final repo = ref.read(proxyRepositoryProvider);
-    final selected = await repo.selectProxy(groupTag, outboundTag).run();
-    final canProbe = selected.match((_) => false, (_) => true);
-    if (!canProbe) {
-      return null;
-    }
-
-    final timer = Stopwatch()..start();
+  Future<int?> _runTcpProbe(_NodeTarget target) async {
+    final watch = Stopwatch()..start();
+    Socket? socket;
     try {
-      final res = await repo.getCurrentIpInfo(CancelToken()).run().timeout(const Duration(seconds: 8));
-      return res.match((_) => null, (_) => timer.elapsedMilliseconds);
+      socket = await Socket.connect(target.host, target.port, timeout: const Duration(seconds: 2));
+      return watch.elapsedMilliseconds;
+    } catch (_) {
+      return 65535;
     } finally {
-      timer.stop();
-      if (restoreTag != null && restoreTag.isNotEmpty && restoreTag != outboundTag) {
-        await repo.selectProxy(groupTag, restoreTag).run();
+      watch.stop();
+      await socket?.close();
+    }
+  }
+
+  Future<int?> _runLightningProbe(
+    WidgetRef ref, {
+    required _NodeEntry item,
+    required Map<String, _NodeTarget> nodeTargets,
+    required dynamic currentGroup,
+  }) async {
+    var target = nodeTargets[item.testTag];
+    if (target == null && item.isSpecial) {
+      final selected = _readSelectedTag(currentGroup);
+      if (selected != null && selected.isNotEmpty) {
+        target = nodeTargets[selected];
       }
     }
-  }
-
-  Future<bool?> _prepareTestConnection(WidgetRef ref) async {
-    final beforeConnected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
-    if (beforeConnected) return true;
-
-    await ref.read(connectionNotifierProvider.notifier).mayConnect();
-    for (var i = 0; i < 16; i++) {
-      final connected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
-      if (connected) return false;
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (target != null) {
+      return _runTcpProbe(target);
     }
-    return null;
-  }
-
-  Future<void> _restoreAfterTest(WidgetRef ref, bool wasConnected) async {
-    if (wasConnected) return;
-    await ref.read(connectionNotifierProvider.notifier).abortConnection();
+    return 65535;
   }
 
   Future<void> _openRenewDialog(BuildContext context) async {
@@ -880,6 +865,20 @@ class _NodeEntry {
   final String testTag;
   final int? linkMs;
   final bool isSpecial;
+}
+
+class _NodeTarget {
+  const _NodeTarget({required this.host, required this.port});
+
+  final String host;
+  final int port;
+}
+
+class _NodeMeta {
+  const _NodeMeta({required this.tags, required this.targets});
+
+  final List<String> tags;
+  final Map<String, _NodeTarget> targets;
 }
 
 class _LatencyAction extends StatelessWidget {

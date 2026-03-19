@@ -21,7 +21,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
   @override
   Widget build(BuildContext context) {
     final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
-    final compact = MediaQuery.sizeOf(context).width < 900;
+    final compact = MediaQuery.sizeOf(context).width < 720;
     String tr(String a, String b) => zh ? a : b;
 
     final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const [];
@@ -198,7 +198,8 @@ class _OfferCard extends ConsumerWidget {
                       textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
                     ),
                     onPressed: () async {
-                      final V2boardSession? session = ref.read(v2etSessionProvider).valueOrNull;
+                      V2boardSession? session = ref.read(v2etSessionProvider).valueOrNull;
+                      session ??= await ref.read(v2etRepositoryProvider).restoreSession();
                       if (session == null || !session.hasToken || offer.id == null) {
                         if (!context.mounted) return;
                         showV2etNotice(context, tr('请先登录后购买', 'Please login before purchase'), error: true);

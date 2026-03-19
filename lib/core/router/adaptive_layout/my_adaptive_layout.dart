@@ -9,7 +9,10 @@ import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
+import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
+import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MyAdaptiveLayout extends HookConsumerWidget {
   const MyAdaptiveLayout({
@@ -58,6 +61,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     }, [isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex]);
     if (v2etMode) {
       final actions = _actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode);
+      final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+      final supportUri = buildV2etSupportUri(runtimeConfig);
       return Material(
         color: const Color(0xFFF5F2F8),
         child: Scaffold(
@@ -75,6 +80,17 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                     ),
                     Expanded(child: navigationShell),
                   ],
+                ),
+          floatingActionButton: supportUri == null
+              ? null
+              : FloatingActionButton(
+                  mini: true,
+                  backgroundColor: const Color(0xFF5A3D89),
+                  foregroundColor: Colors.white,
+                  onPressed: () async {
+                    await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+                  },
+                  child: const Icon(Icons.support_agent_rounded),
                 ),
           bottomNavigationBar: isMobileBreakpoint
               ? _V2etBottomBar(

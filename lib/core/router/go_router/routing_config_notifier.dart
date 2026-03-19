@@ -167,6 +167,52 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                             child: SettingsPage(),
                           ),
                         ),
+                        routes: <GoRoute>[
+                          GoRoute(
+                            name: 'general',
+                            path: '/general',
+                            pageBuilder: (_, state) =>
+                                customTransition(TransitionType.slide, state.pageKey, const GeneralPage()),
+                          ),
+                          GoRoute(
+                            name: 'routeOptions',
+                            path: '/route-options',
+                            pageBuilder: (_, state) =>
+                                customTransition(TransitionType.slide, state.pageKey, const RouteOptionsPage()),
+                            routes: <GoRoute>[
+                              GoRoute(
+                                name: 'perAppProxy',
+                                path: '/per-app-proxy',
+                                pageBuilder: (_, state) =>
+                                    customTransition(TransitionType.slide, state.pageKey, const PerAppProxyPage()),
+                              ),
+                            ],
+                          ),
+                          GoRoute(
+                            name: 'dnsOptions',
+                            path: '/dns-options',
+                            pageBuilder: (_, state) =>
+                                customTransition(TransitionType.slide, state.pageKey, const DnsOptionsPage()),
+                          ),
+                          GoRoute(
+                            name: 'warpOptions',
+                            path: '/warp-options',
+                            pageBuilder: (_, state) =>
+                                customTransition(TransitionType.slide, state.pageKey, const WarpOptionsPage()),
+                          ),
+                          GoRoute(
+                            name: 'tlsTricks',
+                            path: '/tls-tricks',
+                            pageBuilder: (_, state) =>
+                                customTransition(TransitionType.slide, state.pageKey, const TlsTricksPage()),
+                          ),
+                          GoRoute(
+                            name: 'inboundOptions',
+                            path: '/inbound-options',
+                            pageBuilder: (_, state) =>
+                                customTransition(TransitionType.slide, state.pageKey, const InboundOptionsPage()),
+                          ),
+                        ],
                       ),
                     ],
                   ),

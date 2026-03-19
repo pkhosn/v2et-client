@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -8,13 +9,13 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
+import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
-import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
@@ -37,7 +38,6 @@ class V2etDashboardPage extends HookConsumerWidget {
     final session = ref.watch(v2etSessionProvider).valueOrNull;
     final notices = ref.watch(v2etNoticesProvider).valueOrNull ?? const [];
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
-    final supportUri = buildV2etSupportUri(runtimeConfig);
     final noticeTrigger = ref.watch(v2etNoticeDialogTriggerProvider);
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
     final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const <V2etStoreOffer>[];
@@ -161,19 +161,19 @@ class V2etDashboardPage extends HookConsumerWidget {
       return null;
     }, [guard, isConnected]);
 
+    useEffect(() {
+      if (guard == _UsageGuard.ok && !warnExpirySoon && !warnTrafficSoon) {
+        return null;
+      }
+      unawaited(_syncSubscriptionAndProfile(ref));
+      final timer = Timer.periodic(const Duration(seconds: 20), (_) {
+        unawaited(_syncSubscriptionAndProfile(ref));
+      });
+      return timer.cancel;
+    }, [guard, warnExpirySoon, warnTrafficSoon]);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2F8),
-      floatingActionButton: supportUri == null
-          ? null
-          : FloatingActionButton(
-              mini: true,
-              backgroundColor: const Color(0xFF5A3D89),
-              foregroundColor: Colors.white,
-              onPressed: () async {
-                await launchUrl(supportUri, mode: LaunchMode.externalApplication);
-              },
-              child: const Icon(Icons.support_agent_rounded),
-            ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, viewport) {
@@ -241,266 +241,285 @@ class V2etDashboardPage extends HookConsumerWidget {
                         constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
                         child: _Card(
                           onTap: () async {
-                            final tags = await _readNodeTags(ref, activeProfile);
+                            var tags = await _readNodeTags(ref, activeProfile);
                             if (!context.mounted) return;
+                            if (tags.isEmpty && guard == _UsageGuard.ok) {
+                              await _syncSubscriptionAndProfile(ref);
+                              tags = await _readNodeTags(ref, activeProfile);
+                            }
                             if (tags.isEmpty && guard == _UsageGuard.ok) {
                               showV2etNotice(context, tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
                               return;
                             }
-                            final picked = await showModalBottomSheet<String>(
+                            final picked = await showDialog<String>(
                               context: context,
-                              backgroundColor: const Color(0xFFF5F2F8),
-                              isScrollControlled: true,
+                              barrierDismissible: true,
                               builder: (ctx) {
-                                return Consumer(
-                                  builder: (context, sheetRef, _) {
-                                    final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
-                                    final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
-                                    final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
-                                    final sheetHeight = isMobileSheet
-                                        ? MediaQuery.of(ctx).size.height * 0.66
-                                        : (MediaQuery.of(ctx).size.height * 0.52).clamp(360.0, 460.0);
-                                    final modalPing = <String, int?>{...pingOverrides.value};
-                                    final modalLink = <String, int?>{...linkOverrides.value};
-                                    final modalPingLoading = <String>{...pingLoading.value};
-                                    final modalLinkLoading = <String>{...linkLoading.value};
+                                return Dialog(
+                                  backgroundColor: const Color(0xFFF5F2F8),
+                                  insetPadding: EdgeInsets.symmetric(
+                                    horizontal: MediaQuery.of(ctx).size.width < 700 ? 12 : 120,
+                                    vertical: MediaQuery.of(ctx).size.width < 700 ? 22 : 48,
+                                  ),
+                                  child: Consumer(
+                                    builder: (context, sheetRef, _) {
+                                      final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
+                                      final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
+                                      final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
+                                      final sheetHeight = isMobileSheet
+                                          ? MediaQuery.of(ctx).size.height * 0.66
+                                          : (MediaQuery.of(ctx).size.height * 0.52).clamp(360.0, 460.0);
+                                      final modalPing = <String, int?>{...pingOverrides.value};
+                                      final modalLink = <String, int?>{...linkOverrides.value};
+                                      final modalPingLoading = <String>{...pingLoading.value};
+                                      final modalLinkLoading = <String>{...linkLoading.value};
 
-                                    return StatefulBuilder(
-                                      builder: (context, setModalState) {
-                                        final entries = _buildNodeEntries(
-                                          tags,
-                                          group,
-                                          pingOverrides: modalPing,
-                                          linkOverrides: modalLink,
-                                          zh: zh,
-                                        );
-                                        return SafeArea(
-                                          child: Center(
-                                            child: ConstrainedBox(
-                                              constraints: BoxConstraints(maxWidth: maxWidth),
-                                              child: Padding(
-                                                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-                                                child: SizedBox(
-                                                  height: sheetHeight,
-                                                  child: Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          Text(
-                                                            tr('选择节点', 'Select Node'),
-                                                            style: const TextStyle(
-                                                              fontWeight: FontWeight.w700,
-                                                              fontSize: 17,
+                                      return StatefulBuilder(
+                                        builder: (context, setModalState) {
+                                          final entries = _buildNodeEntries(
+                                            tags,
+                                            group,
+                                            pingOverrides: modalPing,
+                                            linkOverrides: modalLink,
+                                            zh: zh,
+                                          );
+                                          return SafeArea(
+                                            child: Center(
+                                              child: ConstrainedBox(
+                                                constraints: BoxConstraints(maxWidth: maxWidth),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                                                  child: SizedBox(
+                                                    height: sheetHeight,
+                                                    child: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Text(
+                                                              tr('选择节点', 'Select Node'),
+                                                              style: const TextStyle(
+                                                                fontWeight: FontWeight.w700,
+                                                                fontSize: 17,
+                                                              ),
                                                             ),
-                                                          ),
-                                                          const Spacer(),
-                                                          OutlinedButton.icon(
-                                                            onPressed: () {
-                                                              modalPing.clear();
-                                                              modalLink.clear();
-                                                              modalPingLoading.clear();
-                                                              modalLinkLoading.clear();
-                                                              pingOverrides.value = {};
-                                                              linkOverrides.value = {};
-                                                              pingLoading.value = {};
-                                                              linkLoading.value = {};
-                                                              sheetRef.invalidate(proxiesOverviewNotifierProvider);
-                                                              setModalState(() {});
-                                                              showV2etNotice(
-                                                                context,
-                                                                tr('线路列表已刷新', 'Routes refreshed'),
-                                                                duration: const Duration(seconds: 1),
-                                                              );
-                                                            },
-                                                            icon: const Icon(Icons.refresh_rounded, size: 15),
-                                                            label: Text(tr('刷新线路', 'Refresh routes')),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      Expanded(
-                                                        child: guard == _UsageGuard.expired
-                                                            ? Center(
-                                                                child: Column(
-                                                                  mainAxisSize: MainAxisSize.min,
-                                                                  children: [
-                                                                    Text(
-                                                                      tr(
-                                                                        '套餐已到期，请续费后查看可用线路',
-                                                                        'Plan expired. Renew to view nodes',
+                                                            const Spacer(),
+                                                            OutlinedButton.icon(
+                                                              onPressed: () {
+                                                                modalPing.clear();
+                                                                modalLink.clear();
+                                                                modalPingLoading.clear();
+                                                                modalLinkLoading.clear();
+                                                                pingOverrides.value = {};
+                                                                linkOverrides.value = {};
+                                                                pingLoading.value = {};
+                                                                linkLoading.value = {};
+                                                                sheetRef.invalidate(proxiesOverviewNotifierProvider);
+                                                                setModalState(() {});
+                                                                showV2etNotice(
+                                                                  context,
+                                                                  tr('线路列表已刷新', 'Routes refreshed'),
+                                                                  duration: const Duration(seconds: 1),
+                                                                );
+                                                              },
+                                                              icon: const Icon(Icons.refresh_rounded, size: 15),
+                                                              label: Text(tr('刷新线路', 'Refresh routes')),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(height: 8),
+                                                        Expanded(
+                                                          child: guard == _UsageGuard.expired
+                                                              ? Center(
+                                                                  child: Column(
+                                                                    mainAxisSize: MainAxisSize.min,
+                                                                    children: [
+                                                                      Text(
+                                                                        tr(
+                                                                          '套餐已到期，请续费后查看可用线路',
+                                                                          'Plan expired. Renew to view nodes',
+                                                                        ),
+                                                                        style: const TextStyle(
+                                                                          color: Color(0xFFC62828),
+                                                                          fontWeight: FontWeight.w700,
+                                                                        ),
                                                                       ),
-                                                                      style: const TextStyle(
-                                                                        color: Color(0xFFC62828),
-                                                                        fontWeight: FontWeight.w700,
+                                                                      const SizedBox(height: 10),
+                                                                      FilledButton.tonalIcon(
+                                                                        onPressed: () {
+                                                                          Navigator.of(ctx).pop();
+                                                                          _openRenewDialog(context);
+                                                                        },
+                                                                        icon: const Icon(
+                                                                          Icons.shopping_bag_rounded,
+                                                                          size: 18,
+                                                                        ),
+                                                                        label: Text(tr('去续费', 'Renew now')),
                                                                       ),
-                                                                    ),
-                                                                    const SizedBox(height: 10),
-                                                                    FilledButton.tonalIcon(
-                                                                      onPressed: () {
-                                                                        Navigator.of(ctx).pop();
-                                                                        _openRenewDialog(context);
-                                                                      },
-                                                                      icon: const Icon(
-                                                                        Icons.shopping_bag_rounded,
-                                                                        size: 18,
+                                                                    ],
+                                                                  ),
+                                                                )
+                                                              : ListView.separated(
+                                                                  itemCount: entries.length,
+                                                                  separatorBuilder: (_, _) => const Divider(height: 1),
+                                                                  itemBuilder: (_, i) {
+                                                                    final item = entries[i];
+                                                                    final pingBusy = modalPingLoading.contains(item.id);
+                                                                    final linkBusy = modalLinkLoading.contains(item.id);
+                                                                    return ListTile(
+                                                                      dense: true,
+                                                                      leading: Text(
+                                                                        item.flag,
+                                                                        style: const TextStyle(fontSize: 20),
                                                                       ),
-                                                                      label: Text(tr('去续费', 'Renew now')),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              )
-                                                            : ListView.separated(
-                                                                itemCount: entries.length,
-                                                                separatorBuilder: (_, _) => const Divider(height: 1),
-                                                                itemBuilder: (_, i) {
-                                                                  final item = entries[i];
-                                                                  final pingBusy = modalPingLoading.contains(item.id);
-                                                                  final linkBusy = modalLinkLoading.contains(item.id);
-                                                                  return ListTile(
-                                                                    dense: true,
-                                                                    leading: Text(
-                                                                      item.flag,
-                                                                      style: const TextStyle(fontSize: 20),
-                                                                    ),
-                                                                    title: Text(item.tag),
-                                                                    trailing: Row(
-                                                                      mainAxisSize: MainAxisSize.min,
-                                                                      children: [
-                                                                        _LatencyAction(
-                                                                          icon: Icons.network_ping_rounded,
-                                                                          loading: pingBusy,
-                                                                          valueMs: item.pingMs,
-                                                                          timeoutText: tr('超时', 'timeout'),
-                                                                          onTap: () async {
-                                                                            modalPingLoading.add(item.id);
-                                                                            setModalState(() {});
-                                                                            try {
+                                                                      title: Text(item.tag),
+                                                                      trailing: Row(
+                                                                        mainAxisSize: MainAxisSize.min,
+                                                                        children: [
+                                                                          _LatencyAction(
+                                                                            icon: Icons.network_ping_rounded,
+                                                                            loading: pingBusy,
+                                                                            valueMs: item.pingMs,
+                                                                            timeoutText: tr('超时', 'timeout'),
+                                                                            onTap: () async {
+                                                                              modalPingLoading.add(item.id);
+                                                                              setModalState(() {});
+                                                                              try {
+                                                                                final groupTag =
+                                                                                    _readGroupTag(group) ?? 'select';
+                                                                                final restoreTag = _readSelectedTag(
+                                                                                  group,
+                                                                                );
+                                                                                final wasConnected =
+                                                                                    await _prepareTestConnection(
+                                                                                      sheetRef,
+                                                                                      context: context,
+                                                                                      zh: zh,
+                                                                                    );
+                                                                                if (wasConnected == null) {
+                                                                                  return;
+                                                                                }
+                                                                                await sheetRef
+                                                                                    .read(proxyRepositoryProvider)
+                                                                                    .selectProxy(groupTag, item.testTag)
+                                                                                    .run();
+                                                                                await sheetRef
+                                                                                    .read(
+                                                                                      proxiesOverviewNotifierProvider
+                                                                                          .notifier,
+                                                                                    )
+                                                                                    .urlTest(groupTag);
+                                                                                final refreshed = sheetRef
+                                                                                    .read(
+                                                                                      proxiesOverviewNotifierProvider,
+                                                                                    )
+                                                                                    .valueOrNull;
+                                                                                final tested =
+                                                                                    _readDelayForTag(
+                                                                                      refreshed,
+                                                                                      item.testTag,
+                                                                                    ) ??
+                                                                                    65535;
+                                                                                modalPing[item.id] = tested <= 0
+                                                                                    ? 65535
+                                                                                    : tested;
+                                                                                pingOverrides.value = {...modalPing};
+                                                                                if (restoreTag != null &&
+                                                                                    restoreTag.isNotEmpty) {
+                                                                                  await sheetRef
+                                                                                      .read(proxyRepositoryProvider)
+                                                                                      .selectProxy(groupTag, restoreTag)
+                                                                                      .run();
+                                                                                }
+                                                                                await _restoreAfterTest(
+                                                                                  sheetRef,
+                                                                                  wasConnected,
+                                                                                );
+                                                                              } finally {
+                                                                                modalPingLoading.remove(item.id);
+                                                                                pingLoading.value = {
+                                                                                  ...modalPingLoading,
+                                                                                };
+                                                                                setModalState(() {});
+                                                                              }
+                                                                            },
+                                                                          ),
+                                                                          const SizedBox(width: 8),
+                                                                          _LatencyAction(
+                                                                            icon: Icons.bolt_rounded,
+                                                                            loading: linkBusy,
+                                                                            valueMs: item.linkMs,
+                                                                            timeoutText: tr('超时', 'timeout'),
+                                                                            onTap: () async {
                                                                               final groupTag =
                                                                                   _readGroupTag(group) ?? 'select';
                                                                               final restoreTag = _readSelectedTag(
                                                                                 group,
                                                                               );
-                                                                              final wasConnected =
-                                                                                  await _prepareTestConnection(
-                                                                                    sheetRef,
-                                                                                    context: context,
-                                                                                    zh: zh,
-                                                                                  );
-                                                                              if (wasConnected == null) {
-                                                                                return;
-                                                                              }
-                                                                              await sheetRef
-                                                                                  .read(proxyRepositoryProvider)
-                                                                                  .selectProxy(groupTag, item.testTag)
-                                                                                  .run();
-                                                                              await sheetRef
-                                                                                  .read(
-                                                                                    proxiesOverviewNotifierProvider
-                                                                                        .notifier,
-                                                                                  )
-                                                                                  .urlTest(groupTag);
-                                                                              final refreshed = sheetRef
-                                                                                  .read(proxiesOverviewNotifierProvider)
-                                                                                  .valueOrNull;
-                                                                              final tested =
-                                                                                  _readDelayForTag(
-                                                                                    refreshed,
-                                                                                    item.testTag,
-                                                                                  ) ??
-                                                                                  65535;
-                                                                              modalPing[item.id] = tested <= 0
-                                                                                  ? 65535
-                                                                                  : tested;
-                                                                              pingOverrides.value = {...modalPing};
-                                                                              if (restoreTag != null &&
-                                                                                  restoreTag.isNotEmpty) {
-                                                                                await sheetRef
-                                                                                    .read(proxyRepositoryProvider)
-                                                                                    .selectProxy(groupTag, restoreTag)
-                                                                                    .run();
-                                                                              }
-                                                                              await _restoreAfterTest(
-                                                                                sheetRef,
-                                                                                wasConnected,
-                                                                              );
-                                                                            } finally {
-                                                                              modalPingLoading.remove(item.id);
-                                                                              pingLoading.value = {...modalPingLoading};
+                                                                              modalLinkLoading.add(item.id);
                                                                               setModalState(() {});
-                                                                            }
-                                                                          },
-                                                                        ),
-                                                                        const SizedBox(width: 8),
-                                                                        _LatencyAction(
-                                                                          icon: Icons.bolt_rounded,
-                                                                          loading: linkBusy,
-                                                                          valueMs: item.linkMs,
-                                                                          timeoutText: tr('超时', 'timeout'),
-                                                                          onTap: () async {
-                                                                            final groupTag =
-                                                                                _readGroupTag(group) ?? 'select';
-                                                                            final restoreTag = _readSelectedTag(group);
-                                                                            modalLinkLoading.add(item.id);
-                                                                            setModalState(() {});
-                                                                            try {
-                                                                              final wasConnected =
-                                                                                  await _prepareTestConnection(
-                                                                                    sheetRef,
-                                                                                    context: context,
-                                                                                    zh: zh,
-                                                                                  );
-                                                                              if (wasConnected == null) {
-                                                                                return;
+                                                                              try {
+                                                                                final wasConnected =
+                                                                                    await _prepareTestConnection(
+                                                                                      sheetRef,
+                                                                                      context: context,
+                                                                                      zh: zh,
+                                                                                    );
+                                                                                if (wasConnected == null) {
+                                                                                  return;
+                                                                                }
+                                                                                final tested = await _runLinkProbe(
+                                                                                  sheetRef,
+                                                                                  groupTag: groupTag,
+                                                                                  outboundTag: item.testTag,
+                                                                                  restoreTag: restoreTag,
+                                                                                );
+                                                                                modalLink[item.id] =
+                                                                                    tested == null || tested <= 0
+                                                                                    ? 65535
+                                                                                    : tested;
+                                                                                linkOverrides.value = {...modalLink};
+                                                                                await _restoreAfterTest(
+                                                                                  sheetRef,
+                                                                                  wasConnected,
+                                                                                );
+                                                                              } finally {
+                                                                                modalLinkLoading.remove(item.id);
+                                                                                linkLoading.value = {
+                                                                                  ...modalLinkLoading,
+                                                                                };
+                                                                                setModalState(() {});
                                                                               }
-                                                                              final tested = await _runLinkProbe(
-                                                                                sheetRef,
-                                                                                groupTag: groupTag,
-                                                                                outboundTag: item.testTag,
-                                                                                restoreTag: restoreTag,
-                                                                              );
-                                                                              modalLink[item.id] =
-                                                                                  tested == null || tested <= 0
-                                                                                  ? 65535
-                                                                                  : tested;
-                                                                              linkOverrides.value = {...modalLink};
-                                                                              await _restoreAfterTest(
-                                                                                sheetRef,
-                                                                                wasConnected,
-                                                                              );
-                                                                            } finally {
-                                                                              modalLinkLoading.remove(item.id);
-                                                                              linkLoading.value = {...modalLinkLoading};
-                                                                              setModalState(() {});
-                                                                            }
-                                                                          },
-                                                                        ),
-                                                                        if (selectedNode.value == item.selectTag) ...[
-                                                                          const SizedBox(width: 8),
-                                                                          const Icon(
-                                                                            Icons.check_rounded,
-                                                                            color: Color(0xFF5A3D89),
-                                                                            size: 20,
+                                                                            },
                                                                           ),
+                                                                          if (selectedNode.value == item.selectTag) ...[
+                                                                            const SizedBox(width: 8),
+                                                                            const Icon(
+                                                                              Icons.check_rounded,
+                                                                              color: Color(0xFF5A3D89),
+                                                                              size: 20,
+                                                                            ),
+                                                                          ],
                                                                         ],
-                                                                      ],
-                                                                    ),
-                                                                    onTap: () => Navigator.of(ctx).pop(item.selectTag),
-                                                                  );
-                                                                },
-                                                              ),
-                                                      ),
-                                                    ],
+                                                                      ),
+                                                                      onTap: () =>
+                                                                          Navigator.of(ctx).pop(item.selectTag),
+                                                                    );
+                                                                  },
+                                                                ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
                                 );
                               },
                             );
@@ -550,6 +569,26 @@ class V2etDashboardPage extends HookConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _syncSubscriptionAndProfile(WidgetRef ref) async {
+    try {
+      final repo = ref.read(v2etRepositoryProvider);
+      final session = await repo.restoreSession();
+      if (session == null || !session.hasToken) {
+        return;
+      }
+      await repo.warmup();
+      final sub = repo.readLastSubscription();
+      final url = sub?.subscriptionUrl.toString().trim();
+      if (url != null && url.isNotEmpty) {
+        await ref.read(addProfileNotifierProvider.notifier).addClipboard(url).catchError((_) {});
+      }
+      ref.invalidate(v2etSessionProvider);
+      ref.invalidate(v2etStoreOffersProvider);
+      ref.invalidate(v2etCountersProvider);
+      ref.invalidate(v2etNoticesProvider);
+    } catch (_) {}
   }
 
   Future<List<String>> _readNodeTags(WidgetRef ref, ProfileEntity? activeProfile) async {

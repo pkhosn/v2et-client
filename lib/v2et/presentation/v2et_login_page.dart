@@ -99,13 +99,7 @@ class V2etLoginPage extends HookConsumerWidget {
         final sub = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
         ref.read(v2etSessionUnlockedProvider.notifier).state = true;
         unawaited(
-          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((
-            error,
-          ) {
-            if (context.mounted) {
-              showV2etNotice(context, tr('订阅导入失败: ', 'Subscription import failed: ') + error.toString(), error: true);
-            }
-          }),
+          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((_) {}),
         );
         if (!context.mounted) return;
         if (context.mounted) showV2etNotice(context, tr('登录成功', 'Login success'), duration: const Duration(seconds: 1));

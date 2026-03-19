@@ -135,194 +135,204 @@ class V2etDashboardPage extends HookConsumerWidget {
               ),
             ),
             const SizedBox(height: 14),
-            _Card(
-              onTap: () async {
-                final tags = await _readNodeTags(ref, activeProfile);
-                if (!context.mounted) return;
-                if (tags.isEmpty) {
-                  ref
-                      .read(inAppNotificationControllerProvider)
-                      .showInfoToast(tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
-                  return;
-                }
-                final picked = await showModalBottomSheet<String>(
-                  context: context,
-                  backgroundColor: const Color(0xFFF5F2F8),
-                  isScrollControlled: true,
-                  builder: (ctx) {
-                    return Consumer(
-                      builder: (context, sheetRef, _) {
-                        final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
-                        final entries = _buildNodeEntries(
-                          tags,
-                          group,
-                          pingOverrides: pingOverrides.value,
-                          linkOverrides: linkOverrides.value,
-                          zh: zh,
-                        );
-                        return SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      tr('选择节点', 'Select Node'),
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-                                    ),
-                                    const Spacer(),
-                                    OutlinedButton.icon(
-                                      onPressed: () async {
-                                        final groupTag = _readGroupTag(group);
-                                        await sheetRef
-                                            .read(proxiesOverviewNotifierProvider.notifier)
-                                            .urlTest(groupTag == null || groupTag.isEmpty ? 'select' : groupTag);
-                                      },
-                                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                                      label: Text(tr('刷新线路', 'Refresh routes')),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  height: MediaQuery.of(ctx).size.height * 0.6,
-                                  child: ListView.separated(
-                                    itemCount: entries.length,
-                                    separatorBuilder: (_, _) => const Divider(height: 1),
-                                    itemBuilder: (_, i) {
-                                      final item = entries[i];
-                                      return ListTile(
-                                        dense: true,
-                                        leading: Text(item.flag, style: const TextStyle(fontSize: 20)),
-                                        title: Text(item.tag),
-                                        subtitle: item.isSpecial
-                                            ? null
-                                            : Text(
-                                                'PING ${_latencyText(item.pingMs)} | LINK ${_latencyText(item.linkMs)}'
-                                                '${item.isTimeout ? (zh ? ' · 超时' : ' · timeout') : ''}',
-                                                style: TextStyle(
-                                                  color: item.isTimeout
-                                                      ? const Color(0xFFC62828)
-                                                      : const Color(0xFF5A5563),
-                                                  fontWeight: item.isTimeout ? FontWeight.w700 : FontWeight.w500,
-                                                ),
+            Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
+                child: _Card(
+                  onTap: () async {
+                    final tags = await _readNodeTags(ref, activeProfile);
+                    if (!context.mounted) return;
+                    if (tags.isEmpty) {
+                      ref
+                          .read(inAppNotificationControllerProvider)
+                          .showInfoToast(tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
+                      return;
+                    }
+                    final picked = await showModalBottomSheet<String>(
+                      context: context,
+                      backgroundColor: const Color(0xFFF5F2F8),
+                      isScrollControlled: true,
+                      builder: (ctx) {
+                        return Consumer(
+                          builder: (context, sheetRef, _) {
+                            final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
+                            final entries = _buildNodeEntries(
+                              tags,
+                              group,
+                              pingOverrides: pingOverrides.value,
+                              linkOverrides: linkOverrides.value,
+                              zh: zh,
+                            );
+                            final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
+                            final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 700.0;
+                            final sheetHeight = MediaQuery.of(ctx).size.height * (isMobileSheet ? 0.76 : 0.68);
+                            return SafeArea(
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(maxWidth: maxWidth),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                                    child: SizedBox(
+                                      height: sheetHeight,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                tr('选择节点', 'Select Node'),
+                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                                               ),
-                                        trailing: item.isSpecial
-                                            ? selectedNode.value == item.tag
-                                                  ? const Icon(Icons.check_rounded, color: Color(0xFF5A3D89))
-                                                  : null
-                                            : Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  _LatencyAction(
-                                                    label: pingLoading.value.contains(item.tag)
-                                                        ? tr('测试中', 'Testing')
-                                                        : _latencyText(item.pingMs),
-                                                    icon: Icons.network_ping_rounded,
-                                                    loading: pingLoading.value.contains(item.tag),
-                                                    timeout: item.pingMs == null || item.pingMs == 65535,
-                                                    onTap: () async {
-                                                      pingLoading.value = {...pingLoading.value, item.tag};
-                                                      try {
-                                                        await sheetRef
-                                                            .read(proxiesOverviewNotifierProvider.notifier)
-                                                            .urlTest(item.tag);
-                                                        final refreshed = sheetRef
-                                                            .read(proxiesOverviewNotifierProvider)
-                                                            .valueOrNull;
-                                                        final tested = _readDelayForTag(refreshed, item.tag) ?? 65535;
-                                                        pingOverrides.value = {
-                                                          ...pingOverrides.value,
-                                                          item.tag: tested <= 0 ? 65535 : tested,
-                                                        };
-                                                      } finally {
-                                                        final next = {...pingLoading.value};
-                                                        next.remove(item.tag);
-                                                        pingLoading.value = next;
-                                                      }
-                                                    },
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  _LatencyAction(
-                                                    label: linkLoading.value.contains(item.tag)
-                                                        ? tr('测试中', 'Testing')
-                                                        : _latencyText(item.linkMs),
-                                                    icon: Icons.bolt_rounded,
-                                                    loading: linkLoading.value.contains(item.tag),
-                                                    timeout: item.linkMs == null || item.linkMs == 65535,
-                                                    onTap: () async {
-                                                      final groupTag = _readGroupTag(group) ?? 'select';
-                                                      final restoreTag = _readSelectedTag(group);
-                                                      linkLoading.value = {...linkLoading.value, item.tag};
-                                                      try {
-                                                        final tested = await _runLinkProbe(
-                                                          sheetRef,
-                                                          groupTag: groupTag,
-                                                          outboundTag: item.tag,
-                                                          restoreTag: restoreTag,
-                                                        );
-                                                        linkOverrides.value = {
-                                                          ...linkOverrides.value,
-                                                          item.tag: tested == null || tested <= 0 ? 65535 : tested,
-                                                        };
-                                                      } finally {
-                                                        final next = {...linkLoading.value};
-                                                        next.remove(item.tag);
-                                                        linkLoading.value = next;
-                                                      }
-                                                    },
-                                                  ),
-                                                ],
+                                              const Spacer(),
+                                              OutlinedButton.icon(
+                                                onPressed: () {
+                                                  pingOverrides.value = {};
+                                                  linkOverrides.value = {};
+                                                  pingLoading.value = {};
+                                                  linkLoading.value = {};
+                                                  sheetRef.invalidate(proxiesOverviewNotifierProvider);
+                                                  sheetRef
+                                                      .read(inAppNotificationControllerProvider)
+                                                      .showInfoToast(tr('线路列表已刷新', 'Routes refreshed'));
+                                                },
+                                                icon: const Icon(Icons.refresh_rounded, size: 16),
+                                                label: Text(tr('刷新线路', 'Refresh routes')),
                                               ),
-                                        onTap: () => Navigator.of(ctx).pop(item.tag),
-                                      );
-                                    },
+                                            ],
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Expanded(
+                                            child: ListView.separated(
+                                              itemCount: entries.length,
+                                              separatorBuilder: (_, _) => const Divider(height: 1),
+                                              itemBuilder: (_, i) {
+                                                final item = entries[i];
+                                                final pingBusy = pingLoading.value.contains(item.id);
+                                                final linkBusy = linkLoading.value.contains(item.id);
+                                                return ListTile(
+                                                  dense: true,
+                                                  leading: Text(item.flag, style: const TextStyle(fontSize: 20)),
+                                                  title: Text(item.tag),
+                                                  trailing: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      _LatencyAction(
+                                                        icon: Icons.network_ping_rounded,
+                                                        loading: pingBusy,
+                                                        valueMs: item.pingMs,
+                                                        timeoutText: tr('超时', 'timeout'),
+                                                        onTap: () async {
+                                                          pingLoading.value = {...pingLoading.value, item.id};
+                                                          try {
+                                                            await sheetRef
+                                                                .read(proxiesOverviewNotifierProvider.notifier)
+                                                                .urlTest(item.testTag);
+                                                            final refreshed = sheetRef
+                                                                .read(proxiesOverviewNotifierProvider)
+                                                                .valueOrNull;
+                                                            final tested =
+                                                                _readDelayForTag(refreshed, item.testTag) ?? 65535;
+                                                            pingOverrides.value = {
+                                                              ...pingOverrides.value,
+                                                              item.id: tested <= 0 ? 65535 : tested,
+                                                            };
+                                                          } finally {
+                                                            final next = {...pingLoading.value};
+                                                            next.remove(item.id);
+                                                            pingLoading.value = next;
+                                                          }
+                                                        },
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      _LatencyAction(
+                                                        icon: Icons.bolt_rounded,
+                                                        loading: linkBusy,
+                                                        valueMs: item.linkMs,
+                                                        timeoutText: tr('超时', 'timeout'),
+                                                        onTap: () async {
+                                                          final groupTag = _readGroupTag(group) ?? 'select';
+                                                          final restoreTag = _readSelectedTag(group);
+                                                          linkLoading.value = {...linkLoading.value, item.id};
+                                                          try {
+                                                            final tested = await _runLinkProbe(
+                                                              sheetRef,
+                                                              groupTag: groupTag,
+                                                              outboundTag: item.testTag,
+                                                              restoreTag: restoreTag,
+                                                            );
+                                                            linkOverrides.value = {
+                                                              ...linkOverrides.value,
+                                                              item.id: tested == null || tested <= 0 ? 65535 : tested,
+                                                            };
+                                                          } finally {
+                                                            final next = {...linkLoading.value};
+                                                            next.remove(item.id);
+                                                            linkLoading.value = next;
+                                                          }
+                                                        },
+                                                      ),
+                                                      if (selectedNode.value == item.selectTag) ...[
+                                                        const SizedBox(width: 8),
+                                                        const Icon(
+                                                          Icons.check_rounded,
+                                                          color: Color(0xFF5A3D89),
+                                                          size: 20,
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                  onTap: () => Navigator.of(ctx).pop(item.selectTag),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
+                              ),
+                            );
+                          },
                         );
                       },
                     );
+                    if (picked != null && picked.isNotEmpty) {
+                      selectedNode.value = picked;
+                    }
                   },
-                );
-                if (picked != null && picked.isNotEmpty) {
-                  selectedNode.value = picked;
-                }
-              },
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5F438E)),
-                    child: const Icon(Icons.public_rounded, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tr('选择节点', 'Select Node'),
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5F438E)),
+                        child: const Icon(Icons.public_rounded, color: Colors.white),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tr('选择节点', 'Select Node'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              selectedNode.value ?? tr('自动选择', 'Auto Select'),
+                              style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          selectedNode.value ?? tr('自动选择', 'Auto Select'),
-                          style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF4C4755), size: 28),
+                    ],
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: Color(0xFF4C4755), size: 28),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -367,37 +377,70 @@ class V2etDashboardPage extends HookConsumerWidget {
     required Map<String, int?> linkOverrides,
     required bool zh,
   }) {
-    final delayMap = <String, int?>{};
-    final lowered = <String>{};
+    final groupTags = <String, String>{};
     try {
       final items = proxyGroup?.items as List<dynamic>?;
       if (items != null) {
         for (final item in items) {
-          final tag = item.tag?.toString() ?? '';
-          final delay = item.urlTestDelay is int ? item.urlTestDelay as int : 0;
+          final tag = item.tag?.toString().trim() ?? '';
           if (tag.isNotEmpty) {
-            delayMap[tag] = delay > 0 ? delay : 65535;
-            lowered.add(tag.toLowerCase());
+            groupTags[tag.toLowerCase()] = tag;
           }
         }
       }
     } catch (_) {}
 
+    String? resolveTag(List<String> candidates) {
+      for (final raw in candidates) {
+        final found = groupTags[raw.toLowerCase()];
+        if (found != null && found.isNotEmpty) return found;
+      }
+      return null;
+    }
+
     final entries = <_NodeEntry>[];
     final autoLabel = zh ? '自动选择' : 'Auto Select';
     final failoverLabel = zh ? '故障转移' : 'Failover';
-    if (!lowered.contains(autoLabel.toLowerCase())) {
-      entries.add(_NodeEntry(tag: autoLabel, flag: '⚡', pingMs: null, linkMs: null, isSpecial: true));
-    }
-    if (!lowered.contains(failoverLabel.toLowerCase())) {
-      entries.add(_NodeEntry(tag: failoverLabel, flag: '🛡️', pingMs: null, linkMs: null, isSpecial: true));
-    }
+    final autoSelectTag = resolveTag([autoLabel, 'auto select', 'auto', 'urltest', 'url-test', 'select']);
+    final failoverTag = resolveTag([failoverLabel, 'failover', 'fallback', '故障转移', '故障转移节点']);
+
+    entries.add(
+      _NodeEntry(
+        id: '__auto__',
+        tag: autoLabel,
+        flag: '⚡',
+        selectTag: autoSelectTag ?? autoLabel,
+        testTag: autoSelectTag ?? autoLabel,
+        pingMs: pingOverrides['__auto__'],
+        linkMs: linkOverrides['__auto__'],
+        isSpecial: true,
+      ),
+    );
+    entries.add(
+      _NodeEntry(
+        id: '__failover__',
+        tag: failoverLabel,
+        flag: '🛡️',
+        selectTag: failoverTag ?? failoverLabel,
+        testTag: failoverTag ?? failoverLabel,
+        pingMs: pingOverrides['__failover__'],
+        linkMs: linkOverrides['__failover__'],
+        isSpecial: true,
+      ),
+    );
 
     entries.addAll(
       tags.map((tag) {
-        final pingMs = pingOverrides[tag] ?? delayMap[tag] ?? 65535;
-        final linkMs = linkOverrides[tag] ?? 65535;
-        return _NodeEntry(tag: tag, flag: _flagForTag(tag), pingMs: pingMs, linkMs: linkMs, isSpecial: false);
+        return _NodeEntry(
+          id: tag,
+          tag: tag,
+          flag: _flagForTag(tag),
+          selectTag: tag,
+          testTag: tag,
+          pingMs: pingOverrides[tag],
+          linkMs: linkOverrides[tag],
+          isSpecial: false,
+        );
       }),
     );
     return entries;
@@ -463,11 +506,6 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  String _latencyText(int? ms) {
-    if (ms == null || ms <= 0) return '65535';
-    return '${ms}ms';
-  }
-
   String _flagForTag(String tag) {
     final t = tag.toLowerCase();
     final entries = <String, String>{
@@ -502,43 +540,46 @@ class V2etDashboardPage extends HookConsumerWidget {
 
 class _NodeEntry {
   const _NodeEntry({
+    required this.id,
     required this.tag,
     required this.flag,
+    required this.selectTag,
+    required this.testTag,
     required this.pingMs,
     required this.linkMs,
     required this.isSpecial,
   });
 
+  final String id;
   final String tag;
   final String flag;
+  final String selectTag;
+  final String testTag;
   final int? pingMs;
   final int? linkMs;
   final bool isSpecial;
-
-  bool get isTimeout {
-    if (isSpecial) return false;
-    return (pingMs == null || pingMs == 65535) || (linkMs == null || linkMs == 65535);
-  }
 }
 
 class _LatencyAction extends StatelessWidget {
   const _LatencyAction({
-    required this.label,
     required this.icon,
     required this.loading,
-    required this.timeout,
+    required this.valueMs,
+    required this.timeoutText,
     required this.onTap,
   });
 
-  final String label;
   final IconData icon;
   final bool loading;
-  final bool timeout;
+  final int? valueMs;
+  final String timeoutText;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final fg = timeout ? const Color(0xFFC62828) : const Color(0xFF1976D2);
+    final hasValue = valueMs != null;
+    final timedOut = hasValue && (valueMs == null || valueMs == 65535 || valueMs! <= 0);
+    final fg = timedOut ? const Color(0xFFC62828) : const Color(0xFF1976D2);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -558,11 +599,13 @@ class _LatencyAction extends StatelessWidget {
                 SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6, color: fg))
               else
                 Icon(icon, size: 14, color: fg),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
-              ),
+              if (hasValue) ...[
+                const SizedBox(width: 4),
+                Text(
+                  timedOut ? timeoutText : '${valueMs}ms',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
+                ),
+              ],
             ],
           ),
         ),

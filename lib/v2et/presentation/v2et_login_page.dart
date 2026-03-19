@@ -18,6 +18,18 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 enum _AuthMode { login, register, forgot }
 
+String _friendlyLoginError(Object error, bool zh) {
+  final raw = error.toString();
+  final message = raw.toLowerCase();
+  if (message.contains('不存在') || message.contains('not exist') || message.contains('not found')) {
+    return zh ? '登录失败：账号不存在' : 'Login failed: account does not exist';
+  }
+  if (message.contains('密码') || message.contains('password') || message.contains('invalid credentials')) {
+    return zh ? '登录失败：密码错误' : 'Login failed: incorrect password';
+  }
+  return (zh ? '登录失败：' : 'Login failed: ') + raw;
+}
+
 class V2etLoginPage extends HookConsumerWidget {
   const V2etLoginPage({super.key});
 
@@ -60,6 +72,17 @@ class V2etLoginPage extends HookConsumerWidget {
         useFuture(authConfigFuture).data ??
         const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
 
+    final modeTitle = switch (authMode.value) {
+      _AuthMode.login => tr('登录', 'Login'),
+      _AuthMode.register => tr('注册', 'Register'),
+      _AuthMode.forgot => tr('找回密码', 'Reset password'),
+    };
+    final modeSubtitle = switch (authMode.value) {
+      _AuthMode.login => tr('欢迎回来，请登录您的账号', 'Welcome back, please login'),
+      _AuthMode.register => tr('创建新账号以开始使用', 'Create a new account to continue'),
+      _AuthMode.forgot => tr('通过邮箱验证码重置密码', 'Reset your password via email verification'),
+    };
+
     Future<void> submit() async {
       if (loading.value) return;
       if (!(formKey.currentState?.validate() ?? false)) return;
@@ -88,7 +111,8 @@ class V2etLoginPage extends HookConsumerWidget {
         ref.read(inAppNotificationControllerProvider).showSuccessToast(tr('登录成功，正在进入客户端', 'Login success'));
         context.go('/home');
       } catch (e) {
-        ref.read(inAppNotificationControllerProvider).showErrorToast(tr('登录失败: ', 'Login failed: ') + e.toString());
+        final message = _friendlyLoginError(e, zh);
+        ref.read(inAppNotificationControllerProvider).showErrorToast(message);
       } finally {
         loading.value = false;
       }
@@ -241,7 +265,7 @@ class V2etLoginPage extends HookConsumerWidget {
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            tr('登录', 'Login'),
+                            modeTitle,
                             style: const TextStyle(
                               fontSize: 48,
                               color: Color(0xFF4C347C),
@@ -250,35 +274,32 @@ class V2etLoginPage extends HookConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            tr('欢迎回来，请登录您的账号', 'Welcome back, please login'),
-                            style: const TextStyle(color: Color(0xFF5F5A67), fontSize: 16),
-                          ),
+                          Text(modeSubtitle, style: const TextStyle(color: Color(0xFF5F5A67), fontSize: 16)),
                           const SizedBox(height: 56),
-                          _V2etInputField(
-                            label: tr('邮箱', 'Email'),
-                            hint: tr('请输入邮箱', 'Enter email'),
-                            icon: Icons.mail_outline_rounded,
-                            controller: emailController,
-                            validator: (value) => (value?.trim().isEmpty ?? true) ? tr('请输入邮箱', 'Enter email') : null,
-                          ),
-                          const SizedBox(height: 16),
-                          _V2etInputField(
-                            label: tr('密码', 'Password'),
-                            hint: tr('请输入密码', 'Enter password'),
-                            icon: Icons.lock_outline_rounded,
-                            controller: passwordController,
-                            obscureText: obscurePassword.value,
-                            trailing: IconButton(
-                              onPressed: () => obscurePassword.value = !obscurePassword.value,
-                              icon: Icon(
-                                obscurePassword.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                color: const Color(0xFF5C5966),
-                              ),
-                            ),
-                            validator: (value) => (value?.isEmpty ?? true) ? tr('请输入密码', 'Enter password') : null,
-                          ),
                           if (authMode.value == _AuthMode.login) ...[
+                            _V2etInputField(
+                              label: tr('邮箱', 'Email'),
+                              hint: tr('请输入邮箱', 'Enter email'),
+                              icon: Icons.mail_outline_rounded,
+                              controller: emailController,
+                              validator: (value) => (value?.trim().isEmpty ?? true) ? tr('请输入邮箱', 'Enter email') : null,
+                            ),
+                            const SizedBox(height: 16),
+                            _V2etInputField(
+                              label: tr('密码', 'Password'),
+                              hint: tr('请输入密码', 'Enter password'),
+                              icon: Icons.lock_outline_rounded,
+                              controller: passwordController,
+                              obscureText: obscurePassword.value,
+                              trailing: IconButton(
+                                onPressed: () => obscurePassword.value = !obscurePassword.value,
+                                icon: Icon(
+                                  obscurePassword.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                  color: const Color(0xFF5C5966),
+                                ),
+                              ),
+                              validator: (value) => (value?.isEmpty ?? true) ? tr('请输入密码', 'Enter password') : null,
+                            ),
                             const SizedBox(height: 14),
                             Row(
                               children: [
@@ -321,7 +342,6 @@ class V2etLoginPage extends HookConsumerWidget {
                               ),
                             ),
                           ] else ...[
-                            const SizedBox(height: 18),
                             FutureBuilder<Uri>(
                               future: resolvedBaseUrl(),
                               builder: (context, snapshot) {

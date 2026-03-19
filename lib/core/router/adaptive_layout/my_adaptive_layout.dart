@@ -71,7 +71,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       selectedIndex: navigationShell.currentIndex,
                       onTap: (index) => _onTap(context, index),
                       onNoticeTap: () => ref.read(v2etNoticeDialogTriggerProvider.notifier).state++,
-                      onSettingsTap: () => context.go('/settings'),
+                      onSettingsTap: () => navigationShell.goBranch(3),
                     ),
                     Expanded(child: navigationShell),
                   ],

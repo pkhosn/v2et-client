@@ -12,10 +12,7 @@ abstract interface class V2boardApi {
 
   Future<V2boardAuthConfig> fetchAuthConfig(Uri baseUrl);
 
-  Future<void> sendEmailVerifyCode({
-    required Uri baseUrl,
-    required String email,
-  });
+  Future<void> sendEmailVerifyCode({required Uri baseUrl, required String email});
 
   Future<void> register({
     required Uri baseUrl,
@@ -96,25 +93,46 @@ class V2boardApiImpl implements V2boardApi {
   @override
   Future<V2boardSession> login(V2boardCredentials credentials) async {
     final uri = _joinApi(credentials.baseUrl, '/api/v1/passport/auth/login');
-    final response = await _dio.postUri<Object?>(
-      uri,
-      data: {
-        'email': credentials.email,
-        'password': credentials.password,
-      },
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      ),
-    );
+    late final Response<Object?> response;
+    try {
+      response = await _dio.postUri<Object?>(
+        uri,
+        data: {'email': credentials.email, 'password': credentials.password},
+        options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
+      );
+    } on DioException catch (error) {
+      final message =
+          _extractApiMessage(error.response?.data) ?? _readString(error.message) ?? 'V2Board login request failed.';
+      throw StateError(message);
+    }
     final json = _readMap(response.data);
     final token = _extractToken(json);
     if (token == null || token.isEmpty) {
       throw StateError('V2Board login succeeded but token is missing.');
     }
     return V2boardSession(baseUrl: credentials.baseUrl, accessToken: token, createdAt: DateTime.now().toUtc());
+  }
+
+  String? _extractApiMessage(Object? responseData) {
+    try {
+      final json = _readMapNullable(responseData);
+      if (json == null) return null;
+      final candidates = [
+        json['message'],
+        json['msg'],
+        json['error'],
+        _readMapNullable(json['data'])?['message'],
+        _readMapNullable(json['data'])?['msg'],
+        _readMapNullable(json['data'])?['error'],
+      ];
+      for (final candidate in candidates) {
+        final text = _readString(candidate);
+        if (text != null) return text;
+      }
+    } catch (_) {
+      return _readString(responseData);
+    }
+    return null;
   }
 
   @override
@@ -144,10 +162,7 @@ class V2boardApiImpl implements V2boardApi {
   @override
   Future<V2boardAuthConfig> fetchAuthConfig(Uri baseUrl) async {
     final uri = _joinApi(baseUrl, '/api/v1/guest/comm/config');
-    final response = await _dio.getUri<Object?>(
-      uri,
-      options: Options(headers: {'Accept': 'application/json'}),
-    );
+    final response = await _dio.getUri<Object?>(uri, options: Options(headers: {'Accept': 'application/json'}));
     final json = _readMap(response.data);
     final data = _readMapNullable(json['data']) ?? json;
     return V2boardAuthConfig(
@@ -163,20 +178,12 @@ class V2boardApiImpl implements V2boardApi {
   }
 
   @override
-  Future<void> sendEmailVerifyCode({
-    required Uri baseUrl,
-    required String email,
-  }) async {
+  Future<void> sendEmailVerifyCode({required Uri baseUrl, required String email}) async {
     final uri = _joinApi(baseUrl, '/api/v1/passport/comm/sendEmailVerify');
     await _dio.postUri<Object?>(
       uri,
       data: {'email': email},
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      ),
+      options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
     );
   }
 
@@ -189,11 +196,7 @@ class V2boardApiImpl implements V2boardApi {
     String? inviteCode,
   }) async {
     final uri = _joinApi(baseUrl, '/api/v1/passport/auth/register');
-    final payload = <String, Object>{
-      'email': email,
-      'password': password,
-      'password_confirmation': password,
-    };
+    final payload = <String, Object>{'email': email, 'password': password, 'password_confirmation': password};
     if (emailCode != null && emailCode.trim().isNotEmpty) {
       payload['email_code'] = emailCode.trim();
     }
@@ -203,12 +206,7 @@ class V2boardApiImpl implements V2boardApi {
     await _dio.postUri<Object?>(
       uri,
       data: payload,
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      ),
+      options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
     );
   }
 
@@ -222,18 +220,8 @@ class V2boardApiImpl implements V2boardApi {
     final uri = _joinApi(baseUrl, '/api/v1/passport/auth/forget');
     await _dio.postUri<Object?>(
       uri,
-      data: {
-        'email': email,
-        'email_code': emailCode,
-        'password': password,
-        'password_confirmation': password,
-      },
-      options: Options(
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      ),
+      data: {'email': email, 'email_code': emailCode, 'password': password, 'password_confirmation': password},
+      options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
     );
   }
 
@@ -242,12 +230,7 @@ class V2boardApiImpl implements V2boardApi {
     for (final authHeader in [token, 'Bearer $token']) {
       final response = await _dio.getUri<Object?>(
         uri,
-        options: Options(
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': authHeader,
-          },
-        ),
+        options: Options(headers: {'Accept': 'application/json', 'Authorization': authHeader}),
       );
       final json = _readMap(response.data);
       if (_extractSubscribeUrl(json) != null) {
@@ -259,13 +242,7 @@ class V2boardApiImpl implements V2boardApi {
 
   String? _extractToken(Map<String, dynamic> json) {
     final data = _readMapNullable(json['data']);
-    final candidates = [
-      data?['auth_data'],
-      data?['token'],
-      json['auth_data'],
-      json['token'],
-      json['access_token'],
-    ];
+    final candidates = [data?['auth_data'], data?['token'], json['auth_data'], json['token'], json['access_token']];
     for (final candidate in candidates) {
       if (candidate is String && candidate.trim().isNotEmpty) {
         return candidate.trim();
@@ -276,12 +253,7 @@ class V2boardApiImpl implements V2boardApi {
 
   Uri? _extractSubscribeUrl(Map<String, dynamic> json) {
     final data = _readMapNullable(json['data']);
-    final candidates = [
-      data?['subscribe_url'],
-      data?['url'],
-      json['subscribe_url'],
-      json['url'],
-    ];
+    final candidates = [data?['subscribe_url'], data?['url'], json['subscribe_url'], json['url']];
     for (final candidate in candidates) {
       if (candidate is String && candidate.trim().isNotEmpty) {
         return Uri.tryParse(candidate.trim());
@@ -316,11 +288,7 @@ class V2boardApiImpl implements V2boardApi {
   }
 
   int? _countLinks(String content) {
-    final lines = content
-        .split(RegExp(r'\r?\n'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
+    final lines = content.split(RegExp(r'\r?\n')).map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
     if (lines.isEmpty) {
       return 0;
     }
@@ -342,11 +310,7 @@ class V2boardApiImpl implements V2boardApi {
     if (value is! List) {
       return const [];
     }
-    return value
-        .map((item) => _readString(item) ?? '')
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .toList();
+    return value.map((item) => _readString(item) ?? '').where((item) => item.isNotEmpty).toSet().toList();
   }
 
   int? _readInt(Object? value) {

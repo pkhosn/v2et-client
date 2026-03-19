@@ -110,19 +110,6 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
       },
       routes: <RouteBase>[
         if (v2etMode) GoRoute(name: 'v2etLogin', path: '/v2et-login', builder: (_, _) => const V2etLoginPage()),
-        if (v2etMode)
-          GoRoute(
-            name: 'settings',
-            path: '/settings',
-            builder: (context, _) => FocusScope(
-              node: branchesScope['settings'],
-              child: PopScope(
-                canPop: false,
-                onPopInvokedWithResult: (_, _) => context.go('/home'),
-                child: SettingsPage(),
-              ),
-            ),
-          ),
         StatefulShellRoute.indexedStack(
           builder: (_, _, navigationShell) => MyAdaptiveLayout(
             navigationShell: navigationShell,
@@ -164,6 +151,22 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         name: 'me',
                         path: '/me',
                         builder: (_, _) => FocusScope(node: branchesScope['about'], child: const V2etMePage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'settings',
+                        path: '/settings',
+                        builder: (context, _) => FocusScope(
+                          node: branchesScope['settings'],
+                          child: PopScope(
+                            canPop: false,
+                            onPopInvokedWithResult: (_, _) => context.go('/home'),
+                            child: SettingsPage(),
+                          ),
+                        ),
                       ),
                     ],
                   ),

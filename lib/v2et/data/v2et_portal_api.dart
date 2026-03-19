@@ -11,24 +11,17 @@ class V2etPortalApi {
 
   Future<List<V2etNotice>> fetchNotices(V2boardSession session) async {
     final json = await _authGet(session, '/api/v1/user/notice/fetch');
-    final rows = _readList(
-      _readMapNullable(json['data'])?['data'] ?? json['data'],
-    );
+    final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
     return rows
         .map(
-          (row) => V2etNotice(
-            title: _readString(row['title']) ?? 'Notice',
-            content: _readString(row['content']) ?? '',
-          ),
+          (row) => V2etNotice(title: _readString(row['title']) ?? 'Notice', content: _readString(row['content']) ?? ''),
         )
         .toList();
   }
 
   Future<List<V2etStoreOffer>> fetchPlans(V2boardSession session) async {
     final json = await _authGet(session, '/api/v1/user/plan/fetch');
-    final rows = _readList(
-      _readMapNullable(json['data'])?['data'] ?? json['data'],
-    );
+    final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
     return rows
         .map(
           (row) => V2etStoreOffer(
@@ -49,16 +42,12 @@ class V2etPortalApi {
     final counters = <String, int>{'orders': 0, 'tickets': 0};
     try {
       final orderJson = await _authGet(session, '/api/v1/user/order/fetch');
-      final orders = _readList(
-        _readMapNullable(orderJson['data'])?['data'] ?? orderJson['data'],
-      );
+      final orders = _readList(_readMapNullable(orderJson['data'])?['data'] ?? orderJson['data']);
       counters['orders'] = orders.length;
     } catch (_) {}
     try {
       final ticketJson = await _authGet(session, '/api/v1/user/ticket/fetch');
-      final tickets = _readList(
-        _readMapNullable(ticketJson['data'])?['data'] ?? ticketJson['data'],
-      );
+      final tickets = _readList(_readMapNullable(ticketJson['data'])?['data'] ?? ticketJson['data']);
       counters['tickets'] = tickets.length;
     } catch (_) {}
     return counters;
@@ -100,10 +89,7 @@ class V2etPortalApi {
     final json = await _authGet(session, '/api/v1/user/invite/fetch');
     final data = _readMapNullable(json['data'])?['data'] ?? json['data'];
     final map = _readMap(data);
-    final codes = _readList(map['codes'])
-        .map((e) => _readString(e['code']))
-        .whereType<String>()
-        .toList();
+    final codes = _readList(map['codes']).map((e) => _readString(e['code'])).whereType<String>().toList();
     final statRaw = map['stat'];
     final stat = <int>[];
     if (statRaw is List) {
@@ -128,58 +114,95 @@ class V2etPortalApi {
     required String periodField,
     required String couponCode,
   }) async {
-    await _authPost(
-      session,
-      '/api/v1/user/coupon/check',
-      data: {
-        'code': couponCode,
-        'plan_id': planId,
-      },
-    );
+    await _authPost(session, '/api/v1/user/coupon/check', data: {'code': couponCode, 'plan_id': planId});
 
     final save = await _authPost(
       session,
       '/api/v1/user/order/save',
-      data: {
-        'plan_id': planId,
-        'period': periodField,
-        'coupon_code': couponCode,
-      },
+      data: {'plan_id': planId, 'period': periodField, 'coupon_code': couponCode},
     );
     final tradeNo = _readString(_readMapNullable(save['data'])?['data'] ?? save['data']);
     if (tradeNo == null || tradeNo.isEmpty) {
       throw StateError('Failed to create coupon order');
     }
 
-    final checkout = await _authPost(
-      session,
-      '/api/v1/user/order/checkout',
-      data: {'trade_no': tradeNo},
-    );
+    final checkout = await _authPost(session, '/api/v1/user/order/checkout', data: {'trade_no': tradeNo});
     final type = _readInt(_readMapNullable(checkout['data'])?['type'] ?? checkout['type']) ?? -1;
     return type == -1;
   }
 
-  Future<Map<String, dynamic>> _authGet(
-    V2boardSession session,
-    String path,
-  ) async {
-    final uri = session.baseUrl.replace(
-      path: path,
-      query: null,
-      fragment: null,
+  Future<List<V2etPaymentMethod>> fetchPaymentMethods(V2boardSession session) async {
+    final json = await _authGet(session, '/api/v1/user/order/getPaymentMethod');
+    final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
+    return rows
+        .map((row) => V2etPaymentMethod(id: _readInt(row['id']) ?? 0, name: _readString(row['name']) ?? 'Payment'))
+        .where((m) => m.id > 0)
+        .toList();
+  }
+
+  Future<String> createOrder({
+    required V2boardSession session,
+    required int planId,
+    required String periodField,
+    String? couponCode,
+  }) async {
+    final save = await _authPost(
+      session,
+      '/api/v1/user/order/save',
+      data: {
+        'plan_id': planId,
+        'period': periodField,
+        if (couponCode != null && couponCode.trim().isNotEmpty) 'coupon_code': couponCode.trim(),
+      },
     );
+    final tradeNo = _readString(_readMapNullable(save['data'])?['data'] ?? save['data']);
+    if (tradeNo == null || tradeNo.isEmpty) {
+      throw StateError('Failed to create order');
+    }
+    return tradeNo;
+  }
+
+  Future<V2etCheckoutResult> checkoutOrder({
+    required V2boardSession session,
+    required String tradeNo,
+    required int paymentMethodId,
+  }) async {
+    final checkout = await _authPost(
+      session,
+      '/api/v1/user/order/checkout',
+      data: {'trade_no': tradeNo, 'method': paymentMethodId},
+    );
+    final type = _readInt(_readMapNullable(checkout['data'])?['type'] ?? checkout['type']) ?? -1;
+    final data = _readString(_readMapNullable(checkout['data'])?['data'] ?? checkout['data']) ?? '';
+    return V2etCheckoutResult(type: type, data: data);
+  }
+
+  Future<int?> checkOrderStatus({required V2boardSession session, required String tradeNo}) async {
+    final uri = session.baseUrl.replace(path: '/api/v1/user/order/check', queryParameters: {'trade_no': tradeNo});
     DioException? last;
-    for (final auth in [
-      session.accessToken.trim(),
-      'Bearer ${session.accessToken.trim()}',
-    ]) {
+    for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
         final response = await _dio.getUri<Object?>(
           uri,
-          options: Options(
-            headers: {'Accept': 'application/json', 'Authorization': auth},
-          ),
+          options: Options(headers: {'Accept': 'application/json', 'Authorization': auth}),
+        );
+        final json = _readMap(response.data);
+        return _readInt(_readMapNullable(json['data'])?['data'] ?? json['data']);
+      } on DioException catch (e) {
+        last = e;
+      }
+    }
+    throw last ?? StateError('Order check failed.');
+  }
+
+  Future<Map<String, dynamic>> _authGet(V2boardSession session, String path) async {
+    final uri = session.baseUrl.replace(path: path, query: null, fragment: null);
+    DioException? last;
+    for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
+      try {
+        final response = await _dio.getUri<Object?>(
+          uri,
+          options: Options(headers: {'Accept': 'application/json', 'Authorization': auth}),
         );
         return _readMap(response.data);
       } on DioException catch (e) {
@@ -194,16 +217,9 @@ class V2etPortalApi {
     String path, {
     required Map<String, Object?> data,
   }) async {
-    final uri = session.baseUrl.replace(
-      path: path,
-      query: null,
-      fragment: null,
-    );
+    final uri = session.baseUrl.replace(path: path, query: null, fragment: null);
     DioException? last;
-    for (final auth in [
-      session.accessToken.trim(),
-      'Bearer ${session.accessToken.trim()}',
-    ]) {
+    for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
         final response = await _dio.postUri<Object?>(
           uri,
@@ -331,12 +347,7 @@ class V2etPortalApi {
   }
 
   int? _extractTraffic(Map<String, dynamic> row) {
-    final candidates = [
-      row['transfer_enable'],
-      row['traffic_limit'],
-      row['data_limit'],
-      row['volume_limit'],
-    ];
+    final candidates = [row['transfer_enable'], row['traffic_limit'], row['data_limit'], row['volume_limit']];
     for (final value in candidates) {
       final parsed = _readInt(value);
       if (parsed != null && parsed > 0) return parsed;
@@ -357,12 +368,7 @@ class V2etPortalApi {
   }
 
   List<String> _extractFeatures(Map<String, dynamic> row) {
-    final candidates = <Object?>[
-      row['content'],
-      row['description'],
-      row['remark'],
-      row['features'],
-    ];
+    final candidates = <Object?>[row['content'], row['description'], row['remark'], row['features']];
     for (final raw in candidates) {
       final parsed = _parseFeaturePayload(raw);
       if (parsed.isEmpty) {

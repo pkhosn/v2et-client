@@ -108,7 +108,11 @@ class V2etLoginPage extends HookConsumerWidget {
           }),
         );
         if (!context.mounted) return;
-        ref.read(inAppNotificationControllerProvider).showSuccessToast(tr('登录成功，正在进入客户端', 'Login success'));
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(tr('登录成功', 'Login success')), duration: const Duration(seconds: 1)));
+        }
         context.go('/home');
       } catch (e) {
         final message = _friendlyLoginError(e, zh);

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
+import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 
 class V2etStorePage extends ConsumerStatefulWidget {
@@ -48,10 +52,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
             Center(
               child: Container(
                 padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8E3EE),
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                decoration: BoxDecoration(color: const Color(0xFFE8E3EE), borderRadius: BorderRadius.circular(24)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -82,16 +83,17 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
               Padding(
                 padding: const EdgeInsets.only(top: 28),
                 child: Center(
-                  child: Text(
-                    tr('暂无套餐数据', 'No plans available yet'),
-                    style: const TextStyle(color: Color(0xFF514C59)),
-                  ),
+                  child: Text(tr('暂无套餐数据', 'No plans available yet'), style: const TextStyle(color: Color(0xFF514C59))),
                 ),
               )
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 1000 ? 2 : 1;
+                  final columns = constraints.maxWidth >= 1180
+                      ? 3
+                      : constraints.maxWidth >= 760
+                      ? 2
+                      : 1;
                   final spacing = 12.0;
                   final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
 
@@ -115,7 +117,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
   }
 }
 
-class _OfferCard extends StatelessWidget {
+class _OfferCard extends ConsumerWidget {
   const _OfferCard({required this.offer, required this.zh});
 
   final V2etStoreOffer offer;
@@ -124,8 +126,8 @@ class _OfferCard extends StatelessWidget {
   String tr(String a, String b) => zh ? a : b;
 
   @override
-  Widget build(BuildContext context) {
-    final featureRows = _featureRows(offer.features);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final description = _descriptionText(offer.features);
     final allPrices = _priceEntries(offer);
     final mainPrice = allPrices.isEmpty ? null : allPrices.first;
 
@@ -135,133 +137,127 @@ class _OfferCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2DDEA)),
       ),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(offer.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          RichText(
-            text: TextSpan(
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            color: const Color(0xFFECE8F3),
+            child: Text(offer.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+            color: const Color(0xFFF2EEF7),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const TextSpan(
-                  text: '¥',
-                  style: TextStyle(color: Color(0xFF2F2A39), fontSize: 20),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: '¥ ',
+                        style: TextStyle(color: Color(0xFF2F2A39), fontSize: 26, fontWeight: FontWeight.w700),
+                      ),
+                      TextSpan(
+                        text: mainPrice == null ? '0.00' : mainPrice.$2.toStringAsFixed(2),
+                        style: const TextStyle(color: Color(0xFF1D2636), fontSize: 48, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
                 ),
-                TextSpan(
-                  text: mainPrice == null ? '0.00' : mainPrice.$2.toStringAsFixed(2),
-                  style: const TextStyle(color: Color(0xFF4D387C), fontSize: 44, fontWeight: FontWeight.w800),
-                ),
-                TextSpan(
-                  text: mainPrice == null ? (zh ? '/未定义' : '/undefined') : _periodSuffix(mainPrice.$1),
-                  style: const TextStyle(color: Color(0xFF484451), fontSize: 18),
+                const SizedBox(height: 4),
+                Text(
+                  mainPrice == null ? tr('未定义周期', 'Undefined period') : _periodLabel(mainPrice.$1),
+                  style: const TextStyle(color: Color(0xFF4E4957), fontSize: 28, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
-          if (allPrices.length > 1) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: allPrices
-                  .skip(1)
-                  .map(
-                    (e) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE9E4EF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_periodLabel(e.$1)} ¥${e.$2.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF3F3A49)),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _StatBox(
-                  icon: Icons.water_drop_outlined,
-                  title: _trafficText(offer.traffic),
-                  subtitle: tr('流量', 'Traffic'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatBox(
-                  icon: Icons.speed_rounded,
-                  title: offer.speed ?? tr('不限速率', 'Unlimited'),
-                  subtitle: tr('速率', 'Speed'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatBox(
-                  icon: Icons.devices_rounded,
-                  title: offer.deviceLimit == null ? tr('不限制', 'Unlimited') : '${offer.deviceLimit}${tr('台', '')}',
-                  subtitle: tr('设备', 'Device'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFD3CEDC)),
-          const SizedBox(height: 12),
-          for (final row in featureRows)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Icon(
-                    row.enabled ? Icons.check_circle : Icons.cancel,
-                    size: 18,
-                    color: row.enabled ? const Color(0xFF5A3D89) : const Color(0xFF9B96A4),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      row.text,
-                      style: TextStyle(
-                        color: row.enabled ? const Color(0xFF2D2737) : const Color(0xFF8F8A97),
-                        decoration: row.enabled ? null : TextDecoration.lineThrough,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 8),
-          SizedBox(
+          Container(
             width: double.infinity,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF573C87),
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(40),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              ),
-              onPressed: () {},
-              icon: const Icon(Icons.shopping_cart_rounded, size: 18),
-              label: Text(tr('立即购买', 'Buy Now')),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            color: const Color(0xFFF8F5FB),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  style: const TextStyle(color: Color(0xFF2D2737), fontSize: 15, height: 1.5),
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFBDECF2),
+                      foregroundColor: const Color(0xFF195A65),
+                      minimumSize: const Size.fromHeight(40),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
+                    ),
+                    onPressed: () async {
+                      final V2boardSession? session = ref.read(v2etSessionProvider).valueOrNull;
+                      if (session == null || !session.hasToken || offer.id == null) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(tr('请先登录后购买', 'Please login before purchase'))));
+                        return;
+                      }
+
+                      final period = await _pickPeriod(context, allPrices);
+                      if (period == null || !context.mounted) return;
+
+                      final method = await _pickPaymentMethod(context, ref, session);
+                      if (method == null || !context.mounted) return;
+
+                      await _startCheckout(
+                        context: context,
+                        ref: ref,
+                        session: session,
+                        planId: offer.id!,
+                        period: period,
+                        paymentMethod: method,
+                      );
+                    },
+                    child: Text(tr('立即订阅', 'Subscribe now')),
+                  ),
+                ),
+              ],
             ),
           ),
+          if (allPrices.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: allPrices
+                    .skip(1)
+                    .map(
+                      (e) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE9E4EF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_periodLabel(e.$1)} ¥${e.$2.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF3F3A49)),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
         ],
       ),
     );
-  }
-
-  String _trafficText(int? trafficBytes) {
-    if (trafficBytes == null || trafficBytes <= 0) return '0GB';
-    final gb = trafficBytes / (1024 * 1024 * 1024);
-    if (gb >= 1) return '${gb.toStringAsFixed(gb >= 100 ? 0 : 2)}GB';
-    final mb = trafficBytes / (1024 * 1024);
-    return '${mb.toStringAsFixed(mb >= 100 ? 0 : 2)}MB';
   }
 
   List<(String, double)> _priceEntries(V2etStoreOffer c) {
@@ -269,20 +265,6 @@ class _OfferCard extends StatelessWidget {
     final entries = c.prices.entries.toList();
     entries.sort((a, b) => order.indexOf(a.key).compareTo(order.indexOf(b.key)));
     return entries.map((e) => (e.key, e.value)).toList();
-  }
-
-  String _periodSuffix(String key) {
-    return switch (key) {
-      'month' => zh ? '/月付' : '/month',
-      'quarter' => zh ? '/季付' : '/quarter',
-      'half_year' => zh ? '/半年' : '/half-year',
-      'year' => zh ? '/年付' : '/year',
-      'two_year' => zh ? '/两年' : '/2-year',
-      'three_year' => zh ? '/三年' : '/3-year',
-      'onetime' => zh ? '/一次性' : '/one-time',
-      'reset' => zh ? '/重置包' : '/reset',
-      _ => zh ? '/周期' : '/period',
-    };
   }
 
   String _periodLabel(String key) {
@@ -299,28 +281,250 @@ class _OfferCard extends StatelessWidget {
     };
   }
 
-  List<_FeatureRow> _featureRows(List<String> source) {
-    return source
-        .take(6)
-        .map((e) {
-          final text = e.trim();
-          final disabled = text.startsWith('-') || text.startsWith('x ') || text.startsWith('✗');
-          return _FeatureRow(
-            text: text.replaceFirst(RegExp(r'^(-|x\s+|✗\s*)'), '').trim(),
-            enabled: !disabled,
-          );
-        })
+  String _descriptionText(List<String> source) {
+    if (source.isEmpty) {
+      return tr('高速稳定网络服务，适配多终端场景。', 'Fast and stable network service for multi-device usage.');
+    }
+    final lines = source
+        .map((e) => e.replaceFirst(RegExp(r'^(-|x\s+|✗\s*)'), '').trim())
+        .where((e) => e.isNotEmpty)
+        .take(4)
         .toList();
+    return lines.join('\n');
+  }
+
+  Future<String?> _pickPeriod(BuildContext context, List<(String, double)> prices) async {
+    if (prices.isEmpty) return null;
+    if (prices.length == 1) return prices.first.$1;
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final entry in prices)
+                ListTile(
+                  title: Text(_periodLabel(entry.$1)),
+                  subtitle: Text('¥ ${entry.$2.toStringAsFixed(2)}'),
+                  onTap: () => Navigator.of(ctx).pop(entry.$1),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<V2etPaymentMethod?> _pickPaymentMethod(BuildContext context, WidgetRef ref, V2boardSession session) async {
+    final methods = await ref.read(v2etPortalApiProvider).fetchPaymentMethods(session);
+    if (!context.mounted) return null;
+    if (methods.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(tr('暂无可用支付方式', 'No payment method available'))));
+      return null;
+    }
+    return showModalBottomSheet<V2etPaymentMethod>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final method in methods)
+                ListTile(title: Text(method.name), onTap: () => Navigator.of(ctx).pop(method)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _startCheckout({
+    required BuildContext context,
+    required WidgetRef ref,
+    required V2boardSession session,
+    required int planId,
+    required String period,
+    required V2etPaymentMethod paymentMethod,
+  }) async {
+    try {
+      final api = ref.read(v2etPortalApiProvider);
+      final tradeNo = await api.createOrder(session: session, planId: planId, periodField: _periodField(period));
+      final checkout = await api.checkoutOrder(session: session, tradeNo: tradeNo, paymentMethodId: paymentMethod.id);
+      if (!context.mounted) return;
+
+      if (checkout.type == -1) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('订单已完成', 'Order completed'))));
+        ref.invalidate(v2etOrdersProvider);
+        return;
+      }
+
+      await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(tr('下单失败: ', 'Checkout failed: ') + e.toString())));
+    }
+  }
+
+  Uri? _resolvePaymentUri(String data) {
+    final raw = data.trim();
+    if (raw.isEmpty) return null;
+
+    final direct = Uri.tryParse(raw);
+    if (direct != null && direct.hasScheme) {
+      return direct;
+    }
+
+    if (raw.startsWith('<')) {
+      final html = Uri.encodeComponent(raw);
+      return Uri.parse('data:text/html;charset=utf-8,$html');
+    }
+
+    final qrData = Uri.encodeComponent(raw);
+    return Uri.parse('https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=$qrData');
+  }
+
+  Future<void> _showPaymentDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required V2boardSession session,
+    required String tradeNo,
+    required V2etCheckoutResult checkout,
+  }) async {
+    final raw = checkout.data.trim();
+    final isHtml = raw.startsWith('<');
+    final paymentUri = _resolvePaymentUri(raw);
+    final qrPayload = isHtml ? null : raw;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        var checking = false;
+        return StatefulBuilder(
+          builder: (innerContext, setState) {
+            Future<void> checkPaid() async {
+              if (checking) return;
+              setState(() => checking = true);
+              try {
+                final status = await ref
+                    .read(v2etPortalApiProvider)
+                    .checkOrderStatus(session: session, tradeNo: tradeNo);
+                if (status == 3) {
+                  ref.invalidate(v2etOrdersProvider);
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(tr('支付成功，套餐已生效', 'Payment successful, plan activated'))));
+                  }
+                } else if (innerContext.mounted) {
+                  ScaffoldMessenger.of(
+                    innerContext,
+                  ).showSnackBar(SnackBar(content: Text(tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'))));
+                }
+              } catch (e) {
+                if (innerContext.mounted) {
+                  ScaffoldMessenger.of(
+                    innerContext,
+                  ).showSnackBar(SnackBar(content: Text(tr('查询订单失败: ', 'Order check failed: ') + e.toString())));
+                }
+              } finally {
+                if (dialogContext.mounted) {
+                  setState(() => checking = false);
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: Text(tr('完成支付', 'Complete payment')),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${tr('订单号', 'Trade No')}: $tradeNo'),
+                    const SizedBox(height: 8),
+                    if (isHtml)
+                      Text(
+                        tr(
+                          '该支付方式优先请在客户端复制支付信息处理，若无法完成再用浏览器备用。',
+                          'Handle payment in-app first. Use browser only as fallback.',
+                        ),
+                      )
+                    else if (paymentUri != null) ...[
+                      Text(tr('请扫码或打开链接完成付款', 'Scan QR code or open link to pay')),
+                      const SizedBox(height: 10),
+                      Center(
+                        child: Image.network(
+                          'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(qrPayload ?? raw)}',
+                          width: 220,
+                          height: 220,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    ] else
+                      Text(tr('支付数据无效，请网页支付', 'Invalid payment payload, please pay in web browser')),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('稍后支付', 'Later'))),
+                if (raw.isNotEmpty)
+                  TextButton(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: raw));
+                      if (!innerContext.mounted) return;
+                      ScaffoldMessenger.of(
+                        innerContext,
+                      ).showSnackBar(SnackBar(content: Text(tr('支付信息已复制', 'Payment info copied'))));
+                    },
+                    child: Text(tr('复制', 'Copy')),
+                  ),
+                if (paymentUri != null)
+                  FilledButton.tonal(
+                    onPressed: () async {
+                      await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+                    },
+                    child: Text(tr('浏览器备用', 'Browser fallback')),
+                  ),
+                FilledButton(
+                  onPressed: checking ? null : checkPaid,
+                  child: Text(checking ? tr('检查中...', 'Checking...') : tr('我已支付，检查状态', 'I paid, check status')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _periodField(String key) {
+    return switch (key) {
+      'month' => 'month_price',
+      'quarter' => 'quarter_price',
+      'half_year' => 'half_year_price',
+      'year' => 'year_price',
+      'two_year' => 'two_year_price',
+      'three_year' => 'three_year_price',
+      'onetime' => 'onetime_price',
+      'reset' => 'reset_price',
+      _ => 'month_price',
+    };
   }
 }
 
 class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
+  const _FilterPill({required this.label, required this.icon, required this.selected, required this.onTap});
 
   final String label;
   final IconData icon;
@@ -355,38 +559,4 @@ class _FilterPill extends StatelessWidget {
       ),
     );
   }
-}
-
-class _StatBox extends StatelessWidget {
-  const _StatBox({required this.icon, required this.title, required this.subtitle});
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEDE8F1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: const Color(0xFF5B438B), size: 20),
-          const SizedBox(height: 4),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), textAlign: TextAlign.center),
-          Text(subtitle, style: const TextStyle(color: Color(0xFF6E6878), fontSize: 12)),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeatureRow {
-  const _FeatureRow({required this.text, required this.enabled});
-
-  final String text;
-  final bool enabled;
 }

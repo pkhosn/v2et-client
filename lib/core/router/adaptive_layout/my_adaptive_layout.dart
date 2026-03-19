@@ -139,7 +139,8 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       return switch (navigationShell.currentIndex) {
         0 => 'home',
         1 => 'profiles',
-        _ => 'about',
+        2 => 'about',
+        _ => 'settings',
       };
     }
     return getNameOfBranch(isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex);

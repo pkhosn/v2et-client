@@ -54,29 +54,32 @@ class V2etDashboardPage extends HookConsumerWidget {
         builder: (dialogContext) => AlertDialog(
           title: Text(zh ? '系统公告' : 'Notice'),
           content: SizedBox(
-            width: 460,
+            width: 360,
             child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: notices.isEmpty
-                    ? [Text(zh ? '暂无公告' : 'No notice')]
-                    : notices
-                          .take(5)
-                          .map(
-                            (n) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 4),
-                                  Text(n.content),
-                                ],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: notices.isEmpty
+                      ? [Text(zh ? '暂无公告' : 'No notice')]
+                      : notices
+                            .take(5)
+                            .map(
+                              (n) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                    const SizedBox(height: 3),
+                                    Text(n.content, style: const TextStyle(fontSize: 13)),
+                                  ],
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(),
+                            )
+                            .toList(),
+                ),
               ),
             ),
           ),
@@ -117,226 +120,261 @@ class V2etDashboardPage extends HookConsumerWidget {
               child: const Icon(Icons.support_agent_rounded),
             ),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, compact ? 12 : 20),
-          children: [
-            Center(
-              child: _PowerButton(
-                enabled: canToggle,
-                active: isConnected,
-                onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                isConnected ? tr('已连接', 'Connected') : tr('开始连接', 'Start Connection'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Center(
+        child: LayoutBuilder(
+          builder: (context, viewport) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, compact ? 12 : 20),
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
-                child: _Card(
-                  onTap: () async {
-                    final tags = await _readNodeTags(ref, activeProfile);
-                    if (!context.mounted) return;
-                    if (tags.isEmpty) {
-                      ref
-                          .read(inAppNotificationControllerProvider)
-                          .showInfoToast(tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
-                      return;
-                    }
-                    final picked = await showModalBottomSheet<String>(
-                      context: context,
-                      backgroundColor: const Color(0xFFF5F2F8),
-                      isScrollControlled: true,
-                      builder: (ctx) {
-                        return Consumer(
-                          builder: (context, sheetRef, _) {
-                            final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
-                            final entries = _buildNodeEntries(
-                              tags,
-                              group,
-                              pingOverrides: pingOverrides.value,
-                              linkOverrides: linkOverrides.value,
-                              zh: zh,
-                            );
-                            final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
-                            final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 700.0;
-                            final sheetHeight = MediaQuery.of(ctx).size.height * (isMobileSheet ? 0.76 : 0.68);
-                            return SafeArea(
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(maxWidth: maxWidth),
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                                    child: SizedBox(
-                                      height: sheetHeight,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Text(
-                                                tr('选择节点', 'Select Node'),
-                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-                                              ),
-                                              const Spacer(),
-                                              OutlinedButton.icon(
-                                                onPressed: () {
-                                                  pingOverrides.value = {};
-                                                  linkOverrides.value = {};
-                                                  pingLoading.value = {};
-                                                  linkLoading.value = {};
-                                                  sheetRef.invalidate(proxiesOverviewNotifierProvider);
-                                                  sheetRef
-                                                      .read(inAppNotificationControllerProvider)
-                                                      .showInfoToast(tr('线路列表已刷新', 'Routes refreshed'));
-                                                },
-                                                icon: const Icon(Icons.refresh_rounded, size: 16),
-                                                label: Text(tr('刷新线路', 'Refresh routes')),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Expanded(
-                                            child: ListView.separated(
-                                              itemCount: entries.length,
-                                              separatorBuilder: (_, _) => const Divider(height: 1),
-                                              itemBuilder: (_, i) {
-                                                final item = entries[i];
-                                                final pingBusy = pingLoading.value.contains(item.id);
-                                                final linkBusy = linkLoading.value.contains(item.id);
-                                                return ListTile(
-                                                  dense: true,
-                                                  leading: Text(item.flag, style: const TextStyle(fontSize: 20)),
-                                                  title: Text(item.tag),
-                                                  trailing: Row(
+                constraints: BoxConstraints(minHeight: viewport.maxHeight - (compact ? 20 : 28)),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _PowerButton(
+                        enabled: canToggle,
+                        active: isConnected,
+                        onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        isConnected ? tr('已连接', 'Connected') : tr('开始连接', 'Start Connection'),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 14),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
+                        child: _Card(
+                          onTap: () async {
+                            final tags = await _readNodeTags(ref, activeProfile);
+                            if (!context.mounted) return;
+                            if (tags.isEmpty) {
+                              ref
+                                  .read(inAppNotificationControllerProvider)
+                                  .showInfoToast(tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
+                              return;
+                            }
+                            final picked = await showModalBottomSheet<String>(
+                              context: context,
+                              backgroundColor: const Color(0xFFF5F2F8),
+                              isScrollControlled: true,
+                              builder: (ctx) {
+                                return Consumer(
+                                  builder: (context, sheetRef, _) {
+                                    final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
+                                    final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
+                                    final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 700.0;
+                                    final sheetHeight = MediaQuery.of(ctx).size.height * (isMobileSheet ? 0.66 : 0.56);
+                                    final modalPing = <String, int?>{...pingOverrides.value};
+                                    final modalLink = <String, int?>{...linkOverrides.value};
+                                    final modalPingLoading = <String>{...pingLoading.value};
+                                    final modalLinkLoading = <String>{...linkLoading.value};
+
+                                    return StatefulBuilder(
+                                      builder: (context, setModalState) {
+                                        final entries = _buildNodeEntries(
+                                          tags,
+                                          group,
+                                          pingOverrides: modalPing,
+                                          linkOverrides: modalLink,
+                                          zh: zh,
+                                        );
+                                        return SafeArea(
+                                          child: Center(
+                                            child: ConstrainedBox(
+                                              constraints: BoxConstraints(maxWidth: maxWidth),
+                                              child: Padding(
+                                                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                                                child: SizedBox(
+                                                  height: sheetHeight,
+                                                  child: Column(
                                                     mainAxisSize: MainAxisSize.min,
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
-                                                      _LatencyAction(
-                                                        icon: Icons.network_ping_rounded,
-                                                        loading: pingBusy,
-                                                        valueMs: item.pingMs,
-                                                        timeoutText: tr('超时', 'timeout'),
-                                                        onTap: () async {
-                                                          pingLoading.value = {...pingLoading.value, item.id};
-                                                          try {
-                                                            await sheetRef
-                                                                .read(proxiesOverviewNotifierProvider.notifier)
-                                                                .urlTest(item.testTag);
-                                                            final refreshed = sheetRef
-                                                                .read(proxiesOverviewNotifierProvider)
-                                                                .valueOrNull;
-                                                            final tested =
-                                                                _readDelayForTag(refreshed, item.testTag) ?? 65535;
-                                                            pingOverrides.value = {
-                                                              ...pingOverrides.value,
-                                                              item.id: tested <= 0 ? 65535 : tested,
-                                                            };
-                                                          } finally {
-                                                            final next = {...pingLoading.value};
-                                                            next.remove(item.id);
-                                                            pingLoading.value = next;
-                                                          }
-                                                        },
+                                                      Row(
+                                                        children: [
+                                                          Text(
+                                                            tr('选择节点', 'Select Node'),
+                                                            style: const TextStyle(
+                                                              fontWeight: FontWeight.w700,
+                                                              fontSize: 17,
+                                                            ),
+                                                          ),
+                                                          const Spacer(),
+                                                          OutlinedButton.icon(
+                                                            onPressed: () {
+                                                              modalPing.clear();
+                                                              modalLink.clear();
+                                                              modalPingLoading.clear();
+                                                              modalLinkLoading.clear();
+                                                              pingOverrides.value = {};
+                                                              linkOverrides.value = {};
+                                                              pingLoading.value = {};
+                                                              linkLoading.value = {};
+                                                              sheetRef.invalidate(proxiesOverviewNotifierProvider);
+                                                              setModalState(() {});
+                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(tr('线路列表已刷新', 'Routes refreshed')),
+                                                                  duration: const Duration(seconds: 1),
+                                                                ),
+                                                              );
+                                                            },
+                                                            icon: const Icon(Icons.refresh_rounded, size: 15),
+                                                            label: Text(tr('刷新线路', 'Refresh routes')),
+                                                          ),
+                                                        ],
                                                       ),
-                                                      const SizedBox(width: 8),
-                                                      _LatencyAction(
-                                                        icon: Icons.bolt_rounded,
-                                                        loading: linkBusy,
-                                                        valueMs: item.linkMs,
-                                                        timeoutText: tr('超时', 'timeout'),
-                                                        onTap: () async {
-                                                          final groupTag = _readGroupTag(group) ?? 'select';
-                                                          final restoreTag = _readSelectedTag(group);
-                                                          linkLoading.value = {...linkLoading.value, item.id};
-                                                          try {
-                                                            final tested = await _runLinkProbe(
-                                                              sheetRef,
-                                                              groupTag: groupTag,
-                                                              outboundTag: item.testTag,
-                                                              restoreTag: restoreTag,
+                                                      const SizedBox(height: 8),
+                                                      Expanded(
+                                                        child: ListView.separated(
+                                                          itemCount: entries.length,
+                                                          separatorBuilder: (_, _) => const Divider(height: 1),
+                                                          itemBuilder: (_, i) {
+                                                            final item = entries[i];
+                                                            final pingBusy = modalPingLoading.contains(item.id);
+                                                            final linkBusy = modalLinkLoading.contains(item.id);
+                                                            return ListTile(
+                                                              dense: true,
+                                                              leading: Text(
+                                                                item.flag,
+                                                                style: const TextStyle(fontSize: 20),
+                                                              ),
+                                                              title: Text(item.tag),
+                                                              trailing: Row(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  _LatencyAction(
+                                                                    icon: Icons.network_ping_rounded,
+                                                                    loading: pingBusy,
+                                                                    valueMs: item.pingMs,
+                                                                    timeoutText: tr('超时', 'timeout'),
+                                                                    onTap: () async {
+                                                                      modalPingLoading.add(item.id);
+                                                                      setModalState(() {});
+                                                                      try {
+                                                                        await sheetRef
+                                                                            .read(
+                                                                              proxiesOverviewNotifierProvider.notifier,
+                                                                            )
+                                                                            .urlTest(item.testTag);
+                                                                        final refreshed = sheetRef
+                                                                            .read(proxiesOverviewNotifierProvider)
+                                                                            .valueOrNull;
+                                                                        final tested =
+                                                                            _readDelayForTag(refreshed, item.testTag) ??
+                                                                            65535;
+                                                                        modalPing[item.id] = tested <= 0
+                                                                            ? 65535
+                                                                            : tested;
+                                                                        pingOverrides.value = {...modalPing};
+                                                                      } finally {
+                                                                        modalPingLoading.remove(item.id);
+                                                                        pingLoading.value = {...modalPingLoading};
+                                                                        setModalState(() {});
+                                                                      }
+                                                                    },
+                                                                  ),
+                                                                  const SizedBox(width: 8),
+                                                                  _LatencyAction(
+                                                                    icon: Icons.bolt_rounded,
+                                                                    loading: linkBusy,
+                                                                    valueMs: item.linkMs,
+                                                                    timeoutText: tr('超时', 'timeout'),
+                                                                    onTap: () async {
+                                                                      final groupTag = _readGroupTag(group) ?? 'select';
+                                                                      final restoreTag = _readSelectedTag(group);
+                                                                      modalLinkLoading.add(item.id);
+                                                                      setModalState(() {});
+                                                                      try {
+                                                                        final tested = await _runLinkProbe(
+                                                                          sheetRef,
+                                                                          groupTag: groupTag,
+                                                                          outboundTag: item.testTag,
+                                                                          restoreTag: restoreTag,
+                                                                        );
+                                                                        modalLink[item.id] =
+                                                                            tested == null || tested <= 0
+                                                                            ? 65535
+                                                                            : tested;
+                                                                        linkOverrides.value = {...modalLink};
+                                                                      } finally {
+                                                                        modalLinkLoading.remove(item.id);
+                                                                        linkLoading.value = {...modalLinkLoading};
+                                                                        setModalState(() {});
+                                                                      }
+                                                                    },
+                                                                  ),
+                                                                  if (selectedNode.value == item.selectTag) ...[
+                                                                    const SizedBox(width: 8),
+                                                                    const Icon(
+                                                                      Icons.check_rounded,
+                                                                      color: Color(0xFF5A3D89),
+                                                                      size: 20,
+                                                                    ),
+                                                                  ],
+                                                                ],
+                                                              ),
+                                                              onTap: () => Navigator.of(ctx).pop(item.selectTag),
                                                             );
-                                                            linkOverrides.value = {
-                                                              ...linkOverrides.value,
-                                                              item.id: tested == null || tested <= 0 ? 65535 : tested,
-                                                            };
-                                                          } finally {
-                                                            final next = {...linkLoading.value};
-                                                            next.remove(item.id);
-                                                            linkLoading.value = next;
-                                                          }
-                                                        },
-                                                      ),
-                                                      if (selectedNode.value == item.selectTag) ...[
-                                                        const SizedBox(width: 8),
-                                                        const Icon(
-                                                          Icons.check_rounded,
-                                                          color: Color(0xFF5A3D89),
-                                                          size: 20,
+                                                          },
                                                         ),
-                                                      ],
+                                                      ),
                                                     ],
                                                   ),
-                                                  onTap: () => Navigator.of(ctx).pop(item.selectTag),
-                                                );
-                                              },
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                            if (picked != null && picked.isNotEmpty) {
+                              selectedNode.value = picked;
+                            }
+                          },
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5F438E)),
+                                child: const Icon(Icons.public_rounded, color: Colors.white),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      tr('选择节点', 'Select Node'),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
                                     ),
-                                  ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      selectedNode.value ?? tr('自动选择', 'Auto Select'),
+                                      style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                    if (picked != null && picked.isNotEmpty) {
-                      selectedNode.value = picked;
-                    }
-                  },
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5F438E)),
-                        child: const Icon(Icons.public_rounded, color: Colors.white),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tr('选择节点', 'Select Node'),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              selectedNode.value ?? tr('自动选择', 'Auto Select'),
-                              style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                              const Icon(Icons.chevron_right_rounded, color: Color(0xFF4C4755), size: 28),
+                            ],
+                          ),
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF4C4755), size: 28),
+                      const SizedBox(height: 10),
                     ],
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-          ],
+            );
+          },
         ),
       ),
     );

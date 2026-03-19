@@ -70,12 +70,12 @@ class V2etCredentialsStore {
     await _preferences.setString(_baseUrlKey, credentials.baseUrl.toString());
     await _preferences.setString(_emailKey, credentials.email);
     await _writeSecure(_passwordKey, credentials.password);
-    await _preferences.remove(_passwordKey);
+    await _preferences.setString(_passwordKey, credentials.password);
   }
 
   Future<void> saveSession(V2boardSession session) async {
     await _writeSecure(_tokenKey, session.accessToken);
-    await _preferences.remove(_tokenKey);
+    await _preferences.setString(_tokenKey, session.accessToken);
     await _preferences.setString(_tokenAtKey, session.createdAt.toUtc().toIso8601String());
   }
 

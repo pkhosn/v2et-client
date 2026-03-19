@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
@@ -24,6 +25,9 @@ class V2etMePage extends HookConsumerWidget {
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
     final session = ref.watch(v2etSessionProvider).valueOrNull;
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
+    final savedCredentialsFuture = useMemoized(() => ref.read(v2etRepositoryProvider).readSavedCredentials());
+    final savedCredentials = useFuture(savedCredentialsFuture).data;
+    final accountEmail = savedCredentials?.email.trim();
     final activeProfile = ref.watch(activeProfileProvider).asData?.value;
     final subInfo = activeProfile is RemoteProfileEntity ? activeProfile.subInfo : null;
     final used = subInfo?.consumption ?? 0;
@@ -175,6 +179,37 @@ class V2etMePage extends HookConsumerWidget {
                           _date(sub?.expiredAt),
                           style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF4F4A57)),
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.alternate_email_rounded, size: 16, color: Color(0xFF5A5563)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          (accountEmail == null || accountEmail.isEmpty)
+                              ? tr('账号未读取', 'Account unavailable')
+                              : accountEmail,
+                          style: const TextStyle(color: Color(0xFF5A5563), fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: (accountEmail == null || accountEmail.isEmpty)
+                            ? null
+                            : () async {
+                                await Clipboard.setData(ClipboardData(text: accountEmail));
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(SnackBar(content: Text(tr('账号已复制', 'Account copied'))));
+                              },
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                        tooltip: tr('复制账号', 'Copy account'),
                       ),
                     ],
                   ),

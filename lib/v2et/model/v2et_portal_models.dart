@@ -5,11 +5,7 @@ class V2etNotice {
 }
 
 class V2etBanner {
-  const V2etBanner({
-    required this.title,
-    required this.imageUrl,
-    this.targetUrl,
-  });
+  const V2etBanner({required this.title, required this.imageUrl, this.targetUrl});
   final String title;
   final String imageUrl;
   final String? targetUrl;
@@ -78,11 +74,22 @@ class V2etTrafficRecord {
 }
 
 class V2etInviteInfo {
-  const V2etInviteInfo({
-    required this.codes,
-    required this.stat,
-  });
+  const V2etInviteInfo({required this.codes, required this.stat});
 
   final List<String> codes;
   final List<int> stat;
+}
+
+class V2etPaymentMethod {
+  const V2etPaymentMethod({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
+class V2etCheckoutResult {
+  const V2etCheckoutResult({required this.type, required this.data});
+
+  final int type;
+  final String data;
 }

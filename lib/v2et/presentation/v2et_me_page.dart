@@ -128,7 +128,7 @@ class V2etMePage extends HookConsumerWidget {
           ref.invalidate(v2etSessionProvider);
           ref.invalidate(v2etNoticesProvider);
           if (context.mounted) {
-            context.go('/home');
+            context.go('/v2et-login');
           }
           break;
       }

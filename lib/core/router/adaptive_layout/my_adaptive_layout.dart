@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -7,6 +9,7 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
@@ -59,10 +62,34 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         HardwareKeyboard.instance.removeHandler(handler);
       };
     }, [isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex]);
+
+    useEffect(() {
+      if (!v2etMode) {
+        return null;
+      }
+      final timer = Timer.periodic(const Duration(minutes: 10), (_) {
+        ref.invalidate(v2etRuntimeConfigProvider);
+      });
+      return timer.cancel;
+    }, [v2etMode]);
+
     if (v2etMode) {
       final actions = _actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode);
       final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
       final supportUri = buildV2etSupportUri(runtimeConfig);
+
+      useEffect(() {
+        final port = runtimeConfig?.defaultPort;
+        if (port == null || port <= 0 || port > 65535) {
+          return null;
+        }
+        final current = ref.read(ConfigOptions.mixedPort);
+        if (current != port) {
+          ref.read(ConfigOptions.mixedPort.notifier).update(port);
+        }
+        return null;
+      }, [runtimeConfig?.defaultPort]);
+
       return Material(
         color: const Color(0xFFF5F2F8),
         child: Scaffold(

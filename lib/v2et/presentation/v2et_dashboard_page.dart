@@ -259,16 +259,18 @@ class V2etDashboardPage extends HookConsumerWidget {
                                   backgroundColor: const Color(0xFFF5F2F8),
                                   insetPadding: EdgeInsets.symmetric(
                                     horizontal: MediaQuery.of(ctx).size.width < 700 ? 12 : 120,
-                                    vertical: MediaQuery.of(ctx).size.width < 700 ? 22 : 48,
+                                    vertical: MediaQuery.of(ctx).size.width < 700 ? 10 : 20,
                                   ),
                                   child: Consumer(
                                     builder: (context, sheetRef, _) {
                                       final group = sheetRef.watch(proxiesOverviewNotifierProvider).valueOrNull;
                                       final isMobileSheet = MediaQuery.of(ctx).size.width < 700;
                                       final maxWidth = isMobileSheet ? MediaQuery.of(ctx).size.width : 560.0;
-                                      final sheetHeight = isMobileSheet
-                                          ? MediaQuery.of(ctx).size.height * 0.66
-                                          : (MediaQuery.of(ctx).size.height * 0.52).clamp(360.0, 460.0);
+                                      final estimatedHeight = 120.0 + (tags.length * 56.0);
+                                      final maxAllowed = isMobileSheet
+                                          ? MediaQuery.of(ctx).size.height * 0.75
+                                          : MediaQuery.of(ctx).size.height * 0.62;
+                                      final sheetHeight = estimatedHeight.clamp(260.0, maxAllowed);
                                       final modalPing = <String, int?>{...pingOverrides.value};
                                       final modalLink = <String, int?>{...linkOverrides.value};
                                       final modalPingLoading = <String>{...pingLoading.value};
@@ -394,8 +396,6 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                                 final wasConnected =
                                                                                     await _prepareTestConnection(
                                                                                       sheetRef,
-                                                                                      context: context,
-                                                                                      zh: zh,
                                                                                     );
                                                                                 if (wasConnected == null) {
                                                                                   return;
@@ -463,8 +463,6 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                                 final wasConnected =
                                                                                     await _prepareTestConnection(
                                                                                       sheetRef,
-                                                                                      context: context,
-                                                                                      zh: zh,
                                                                                     );
                                                                                 if (wasConnected == null) {
                                                                                   return;
@@ -756,39 +754,15 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  Future<bool?> _prepareTestConnection(WidgetRef ref, {required BuildContext context, required bool zh}) async {
+  Future<bool?> _prepareTestConnection(WidgetRef ref) async {
     final beforeConnected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
     if (beforeConnected) return true;
-
-    final confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text(zh ? '进入测试模式' : 'Enter test mode'),
-            content: Text(
-              zh
-                  ? '将临时启动线路测试通道，测试后自动关闭，不会保持连接状态。是否继续？'
-                  : 'A temporary test tunnel will start and close automatically after testing. Continue?',
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(zh ? '取消' : 'Cancel')),
-              FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(zh ? '继续' : 'Continue')),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) {
-      return null;
-    }
 
     await ref.read(connectionNotifierProvider.notifier).mayConnect();
     for (var i = 0; i < 16; i++) {
       final connected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
       if (connected) return false;
       await Future<void>.delayed(const Duration(milliseconds: 150));
-    }
-    if (context.mounted) {
-      showV2etNotice(context, zh ? '测试通道启动失败' : 'Failed to start test tunnel', error: true);
     }
     return null;
   }
@@ -931,25 +905,35 @@ class V2etDashboardPage extends HookConsumerWidget {
     final t = tag.toLowerCase();
     final entries = <String, String>{
       'hong kong': '🇭🇰',
+      '香港': '🇭🇰',
       'hk': '🇭🇰',
       'japan': '🇯🇵',
+      '日本': '🇯🇵',
       'jp': '🇯🇵',
       'singapore': '🇸🇬',
+      '新加坡': '🇸🇬',
       'sg': '🇸🇬',
       'usa': '🇺🇸',
+      '美国': '🇺🇸',
       'us': '🇺🇸',
       'united states': '🇺🇸',
       'korea': '🇰🇷',
+      '韩国': '🇰🇷',
       'kr': '🇰🇷',
       'taiwan': '🇹🇼',
+      '台湾': '🇹🇼',
       'tw': '🇹🇼',
       'germany': '🇩🇪',
+      '德国': '🇩🇪',
       'de': '🇩🇪',
       'uk': '🇬🇧',
+      '英国': '🇬🇧',
       'united kingdom': '🇬🇧',
       'france': '🇫🇷',
+      '法国': '🇫🇷',
       'fr': '🇫🇷',
       'canada': '🇨🇦',
+      '加拿大': '🇨🇦',
       'ca': '🇨🇦',
     };
     for (final e in entries.entries) {

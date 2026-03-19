@@ -156,11 +156,11 @@ class _OfferCard extends ConsumerWidget {
                     children: [
                       const TextSpan(
                         text: '¥ ',
-                        style: TextStyle(color: Color(0xFF2F2A39), fontSize: 26, fontWeight: FontWeight.w700),
+                        style: TextStyle(color: Color(0xFF2F2A39), fontSize: 20, fontWeight: FontWeight.w700),
                       ),
                       TextSpan(
                         text: mainPrice == null ? '0.00' : mainPrice.$2.toStringAsFixed(2),
-                        style: const TextStyle(color: Color(0xFF1D2636), fontSize: 48, fontWeight: FontWeight.w800),
+                        style: const TextStyle(color: Color(0xFF1D2636), fontSize: 36, fontWeight: FontWeight.w800),
                       ),
                     ],
                   ),
@@ -168,7 +168,7 @@ class _OfferCard extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   mainPrice == null ? tr('未定义周期', 'Undefined period') : _periodLabel(mainPrice.$1),
-                  style: const TextStyle(color: Color(0xFF4E4957), fontSize: 28, fontWeight: FontWeight.w500),
+                  style: const TextStyle(color: Color(0xFF4E4957), fontSize: 20, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -292,22 +292,26 @@ class _OfferCard extends ConsumerWidget {
   Future<String?> _pickPeriod(BuildContext context, List<(String, double)> prices) async {
     if (prices.isEmpty) return null;
     if (prices.length == 1) return prices.first.$1;
-    return showModalBottomSheet<String>(
+    return showDialog<String>(
       context: context,
-      showDragHandle: true,
       builder: (ctx) {
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final entry in prices)
-                ListTile(
-                  title: Text(_periodLabel(entry.$1)),
-                  subtitle: Text('¥ ${entry.$2.toStringAsFixed(2)}'),
-                  onTap: () => Navigator.of(ctx).pop(entry.$1),
-                ),
-            ],
+        return AlertDialog(
+          title: Text(tr('选择套餐周期', 'Select billing period')),
+          content: SizedBox(
+            width: 360,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final entry in prices)
+                  ListTile(
+                    title: Text(_periodLabel(entry.$1)),
+                    subtitle: Text('¥ ${entry.$2.toStringAsFixed(2)}'),
+                    onTap: () => Navigator.of(ctx).pop(entry.$1),
+                  ),
+              ],
+            ),
           ),
+          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr('取消', 'Cancel')))],
         );
       },
     );
@@ -320,18 +324,22 @@ class _OfferCard extends ConsumerWidget {
       showV2etNotice(context, tr('暂无可用支付方式', 'No payment method available'), error: true);
       return null;
     }
-    return showModalBottomSheet<V2etPaymentMethod>(
+    return showDialog<V2etPaymentMethod>(
       context: context,
-      showDragHandle: true,
       builder: (ctx) {
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final method in methods)
-                ListTile(title: Text(method.name), onTap: () => Navigator.of(ctx).pop(method)),
-            ],
+        return AlertDialog(
+          title: Text(tr('选择支付方式', 'Select payment method')),
+          content: SizedBox(
+            width: 360,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final method in methods)
+                  ListTile(title: Text(method.name), onTap: () => Navigator.of(ctx).pop(method)),
+              ],
+            ),
           ),
+          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr('取消', 'Cancel')))],
         );
       },
     );

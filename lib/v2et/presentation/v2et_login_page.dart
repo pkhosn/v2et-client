@@ -12,9 +12,12 @@ import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
 import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
+import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
+import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum _AuthMode { login, register, forgot }
 
@@ -71,6 +74,8 @@ class V2etLoginPage extends HookConsumerWidget {
     final authConfig =
         useFuture(authConfigFuture).data ??
         const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
+    final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+    final supportUri = buildV2etSupportUri(runtimeConfig);
 
     final modeTitle = switch (authMode.value) {
       _AuthMode.login => tr('登录', 'Login'),
@@ -116,6 +121,17 @@ class V2etLoginPage extends HookConsumerWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2F8),
+      floatingActionButton: supportUri == null
+          ? null
+          : FloatingActionButton(
+              mini: true,
+              backgroundColor: const Color(0xFF5A3D89),
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+              },
+              child: const Icon(Icons.support_agent_rounded),
+            ),
       body: Row(
         children: [
           if (!compact)

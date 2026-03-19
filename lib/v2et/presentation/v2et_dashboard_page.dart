@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
@@ -15,9 +15,13 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
+import 'package:hiddify/v2et/model/v2board_session.dart';
+import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+enum _UsageGuard { ok, expired, outOfTraffic }
 
 class V2etDashboardPage extends HookConsumerWidget {
   const V2etDashboardPage({super.key});
@@ -35,18 +39,41 @@ class V2etDashboardPage extends HookConsumerWidget {
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
     final supportUri = buildV2etSupportUri(runtimeConfig);
     final noticeTrigger = ref.watch(v2etNoticeDialogTriggerProvider);
+    final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
+    final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const <V2etStoreOffer>[];
     final selectedNode = useState<String?>(null);
     final noticeShown = useState(false);
+    final statusNotifiedKey = useState<String?>(null);
     final pingOverrides = useState<Map<String, int?>>({});
     final linkOverrides = useState<Map<String, int?>>({});
     final pingLoading = useState<Set<String>>({});
     final linkLoading = useState<Set<String>>({});
+
+    final remoteInfo = activeProfile is RemoteProfileEntity ? activeProfile.subInfo : null;
+    final totalBytes = remoteInfo?.total ?? sub?.transferEnableBytes;
+    final usedBytes = remoteInfo?.consumption ?? 0;
+    final remainingBytes = totalBytes == null ? null : (totalBytes - usedBytes).clamp(0, totalBytes);
+    final remainingDays = remoteInfo?.remaining.inDays;
+    final warnDays = runtimeConfig?.expiryWarnDays ?? 3;
+    final warnTrafficBytes = runtimeConfig?.trafficWarnBytes ?? (3 * 1024 * 1024 * 1024);
+    final expired =
+        (sub?.expiredAt?.isBefore(DateTime.now()) ?? false) || ((remoteInfo?.remaining.inSeconds ?? 1) <= 0);
+    final outOfTraffic = totalBytes != null && totalBytes > 0 && usedBytes >= totalBytes;
+    final warnExpirySoon = !expired && remainingDays != null && remainingDays >= 0 && remainingDays <= warnDays;
+    final warnTrafficSoon =
+        !outOfTraffic && remainingBytes != null && remainingBytes > 0 && remainingBytes <= warnTrafficBytes;
+    final guard = expired
+        ? _UsageGuard.expired
+        : outOfTraffic
+        ? _UsageGuard.outOfTraffic
+        : _UsageGuard.ok;
 
     final canToggle = switch (connection) {
       AsyncData(value: Connected()) || AsyncData(value: Disconnected()) || AsyncError() => true,
       _ => false,
     };
     final isConnected = connection.valueOrNull == const Connected();
+    final connectEnabled = canToggle && guard == _UsageGuard.ok;
 
     void showNoticesDialog() {
       if (!context.mounted) return;
@@ -107,6 +134,33 @@ class V2etDashboardPage extends HookConsumerWidget {
       return null;
     }, [noticeTrigger]);
 
+    useEffect(() {
+      if (guard == _UsageGuard.ok) {
+        statusNotifiedKey.value = null;
+        return null;
+      }
+      final key = guard.name;
+      if (statusNotifiedKey.value != key) {
+        statusNotifiedKey.value = key;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          showV2etNotice(
+            context,
+            guard == _UsageGuard.expired
+                ? tr('套餐已到期，请续费后使用', 'Plan expired, please renew to continue')
+                : tr('流量已耗尽，请重置流量后使用', 'Traffic exhausted, reset traffic to continue'),
+            error: true,
+          );
+        });
+      }
+      if (isConnected) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(connectionNotifierProvider.notifier).abortConnection();
+        });
+      }
+      return null;
+    }, [guard, isConnected]);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2F8),
       floatingActionButton: supportUri == null
@@ -132,10 +186,51 @@ class V2etDashboardPage extends HookConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _PowerButton(
-                        enabled: canToggle,
+                        enabled: connectEnabled,
                         active: isConnected,
                         onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
                       ),
+                      if (guard != _UsageGuard.ok) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          guard == _UsageGuard.expired
+                              ? tr('套餐已到期，请续费后使用', 'Plan expired, please renew to continue')
+                              : tr('流量已耗尽，请重置流量后使用', 'Traffic exhausted, reset traffic to continue'),
+                          style: const TextStyle(color: Color(0xFFC62828), fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        const SizedBox(height: 6),
+                        if (guard == _UsageGuard.expired)
+                          FilledButton.tonalIcon(
+                            onPressed: () => _openRenewDialog(context),
+                            icon: const Icon(Icons.shopping_bag_rounded, size: 18),
+                            label: Text(tr('续费套餐', 'Renew plan')),
+                          )
+                        else
+                          FilledButton.tonalIcon(
+                            onPressed: () => _openResetDialog(context, ref, offers, session, zh),
+                            icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                            label: Text(tr('重置流量', 'Reset traffic')),
+                          ),
+                      ] else if (warnExpirySoon || warnTrafficSoon) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          warnExpirySoon
+                              ? tr(
+                                  '套餐将在$remainingDays天后到期，请及时续费',
+                                  'Plan expires in $remainingDays day(s), please renew',
+                                )
+                              : tr('剩余流量不足，请及时重置或续费', 'Low remaining traffic, please reset or renew'),
+                          style: const TextStyle(color: Color(0xFFB26A00), fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                        const SizedBox(height: 6),
+                        FilledButton.tonalIcon(
+                          onPressed: warnExpirySoon
+                              ? () => _openRenewDialog(context)
+                              : () => _openResetDialog(context, ref, offers, session, zh),
+                          icon: Icon(warnExpirySoon ? Icons.shopping_bag_rounded : Icons.restart_alt_rounded, size: 18),
+                          label: Text(warnExpirySoon ? tr('去续费', 'Renew') : tr('去重置流量', 'Reset traffic')),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Text(
                         isConnected ? tr('已连接', 'Connected') : tr('开始连接', 'Start Connection'),
@@ -148,10 +243,8 @@ class V2etDashboardPage extends HookConsumerWidget {
                           onTap: () async {
                             final tags = await _readNodeTags(ref, activeProfile);
                             if (!context.mounted) return;
-                            if (tags.isEmpty) {
-                              ref
-                                  .read(inAppNotificationControllerProvider)
-                                  .showInfoToast(tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
+                            if (tags.isEmpty && guard == _UsageGuard.ok) {
+                              showV2etNotice(context, tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
                               return;
                             }
                             final picked = await showModalBottomSheet<String>(
@@ -228,118 +321,175 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                       ),
                                                       const SizedBox(height: 8),
                                                       Expanded(
-                                                        child: ListView.separated(
-                                                          itemCount: entries.length,
-                                                          separatorBuilder: (_, _) => const Divider(height: 1),
-                                                          itemBuilder: (_, i) {
-                                                            final item = entries[i];
-                                                            final pingBusy = modalPingLoading.contains(item.id);
-                                                            final linkBusy = modalLinkLoading.contains(item.id);
-                                                            return ListTile(
-                                                              dense: true,
-                                                              leading: Text(
-                                                                item.flag,
-                                                                style: const TextStyle(fontSize: 20),
-                                                              ),
-                                                              title: Text(item.tag),
-                                                              trailing: Row(
-                                                                mainAxisSize: MainAxisSize.min,
-                                                                children: [
-                                                                  _LatencyAction(
-                                                                    icon: Icons.network_ping_rounded,
-                                                                    loading: pingBusy,
-                                                                    valueMs: item.pingMs,
-                                                                    timeoutText: tr('超时', 'timeout'),
-                                                                    onTap: () async {
-                                                                      modalPingLoading.add(item.id);
-                                                                      setModalState(() {});
-                                                                      try {
-                                                                        final groupTag =
-                                                                            _readGroupTag(group) ?? 'select';
-                                                                        final restoreTag = _readSelectedTag(group);
-                                                                        final wasConnected =
-                                                                            await _prepareTestConnection(sheetRef);
-                                                                        await sheetRef
-                                                                            .read(proxyRepositoryProvider)
-                                                                            .selectProxy(groupTag, item.testTag)
-                                                                            .run();
-                                                                        await sheetRef
-                                                                            .read(
-                                                                              proxiesOverviewNotifierProvider.notifier,
-                                                                            )
-                                                                            .urlTest(groupTag);
-                                                                        final refreshed = sheetRef
-                                                                            .read(proxiesOverviewNotifierProvider)
-                                                                            .valueOrNull;
-                                                                        final tested =
-                                                                            _readDelayForTag(refreshed, item.testTag) ??
-                                                                            65535;
-                                                                        modalPing[item.id] = tested <= 0
-                                                                            ? 65535
-                                                                            : tested;
-                                                                        pingOverrides.value = {...modalPing};
-                                                                        if (restoreTag != null &&
-                                                                            restoreTag.isNotEmpty) {
-                                                                          await sheetRef
-                                                                              .read(proxyRepositoryProvider)
-                                                                              .selectProxy(groupTag, restoreTag)
-                                                                              .run();
-                                                                        }
-                                                                        await _restoreAfterTest(sheetRef, wasConnected);
-                                                                      } finally {
-                                                                        modalPingLoading.remove(item.id);
-                                                                        pingLoading.value = {...modalPingLoading};
-                                                                        setModalState(() {});
-                                                                      }
-                                                                    },
-                                                                  ),
-                                                                  const SizedBox(width: 8),
-                                                                  _LatencyAction(
-                                                                    icon: Icons.bolt_rounded,
-                                                                    loading: linkBusy,
-                                                                    valueMs: item.linkMs,
-                                                                    timeoutText: tr('超时', 'timeout'),
-                                                                    onTap: () async {
-                                                                      final groupTag = _readGroupTag(group) ?? 'select';
-                                                                      final restoreTag = _readSelectedTag(group);
-                                                                      modalLinkLoading.add(item.id);
-                                                                      setModalState(() {});
-                                                                      try {
-                                                                        final wasConnected =
-                                                                            await _prepareTestConnection(sheetRef);
-                                                                        final tested = await _runLinkProbe(
-                                                                          sheetRef,
-                                                                          groupTag: groupTag,
-                                                                          outboundTag: item.testTag,
-                                                                          restoreTag: restoreTag,
-                                                                        );
-                                                                        modalLink[item.id] =
-                                                                            tested == null || tested <= 0
-                                                                            ? 65535
-                                                                            : tested;
-                                                                        linkOverrides.value = {...modalLink};
-                                                                        await _restoreAfterTest(sheetRef, wasConnected);
-                                                                      } finally {
-                                                                        modalLinkLoading.remove(item.id);
-                                                                        linkLoading.value = {...modalLinkLoading};
-                                                                        setModalState(() {});
-                                                                      }
-                                                                    },
-                                                                  ),
-                                                                  if (selectedNode.value == item.selectTag) ...[
-                                                                    const SizedBox(width: 8),
-                                                                    const Icon(
-                                                                      Icons.check_rounded,
-                                                                      color: Color(0xFF5A3D89),
-                                                                      size: 20,
+                                                        child: guard == _UsageGuard.expired
+                                                            ? Center(
+                                                                child: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Text(
+                                                                      tr(
+                                                                        '套餐已到期，请续费后查看可用线路',
+                                                                        'Plan expired. Renew to view nodes',
+                                                                      ),
+                                                                      style: const TextStyle(
+                                                                        color: Color(0xFFC62828),
+                                                                        fontWeight: FontWeight.w700,
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 10),
+                                                                    FilledButton.tonalIcon(
+                                                                      onPressed: () {
+                                                                        Navigator.of(ctx).pop();
+                                                                        _openRenewDialog(context);
+                                                                      },
+                                                                      icon: const Icon(
+                                                                        Icons.shopping_bag_rounded,
+                                                                        size: 18,
+                                                                      ),
+                                                                      label: Text(tr('去续费', 'Renew now')),
                                                                     ),
                                                                   ],
-                                                                ],
+                                                                ),
+                                                              )
+                                                            : ListView.separated(
+                                                                itemCount: entries.length,
+                                                                separatorBuilder: (_, _) => const Divider(height: 1),
+                                                                itemBuilder: (_, i) {
+                                                                  final item = entries[i];
+                                                                  final pingBusy = modalPingLoading.contains(item.id);
+                                                                  final linkBusy = modalLinkLoading.contains(item.id);
+                                                                  return ListTile(
+                                                                    dense: true,
+                                                                    leading: Text(
+                                                                      item.flag,
+                                                                      style: const TextStyle(fontSize: 20),
+                                                                    ),
+                                                                    title: Text(item.tag),
+                                                                    trailing: Row(
+                                                                      mainAxisSize: MainAxisSize.min,
+                                                                      children: [
+                                                                        _LatencyAction(
+                                                                          icon: Icons.network_ping_rounded,
+                                                                          loading: pingBusy,
+                                                                          valueMs: item.pingMs,
+                                                                          timeoutText: tr('超时', 'timeout'),
+                                                                          onTap: () async {
+                                                                            modalPingLoading.add(item.id);
+                                                                            setModalState(() {});
+                                                                            try {
+                                                                              final groupTag =
+                                                                                  _readGroupTag(group) ?? 'select';
+                                                                              final restoreTag = _readSelectedTag(
+                                                                                group,
+                                                                              );
+                                                                              final wasConnected =
+                                                                                  await _prepareTestConnection(
+                                                                                    sheetRef,
+                                                                                    context: context,
+                                                                                    zh: zh,
+                                                                                  );
+                                                                              if (wasConnected == null) {
+                                                                                return;
+                                                                              }
+                                                                              await sheetRef
+                                                                                  .read(proxyRepositoryProvider)
+                                                                                  .selectProxy(groupTag, item.testTag)
+                                                                                  .run();
+                                                                              await sheetRef
+                                                                                  .read(
+                                                                                    proxiesOverviewNotifierProvider
+                                                                                        .notifier,
+                                                                                  )
+                                                                                  .urlTest(groupTag);
+                                                                              final refreshed = sheetRef
+                                                                                  .read(proxiesOverviewNotifierProvider)
+                                                                                  .valueOrNull;
+                                                                              final tested =
+                                                                                  _readDelayForTag(
+                                                                                    refreshed,
+                                                                                    item.testTag,
+                                                                                  ) ??
+                                                                                  65535;
+                                                                              modalPing[item.id] = tested <= 0
+                                                                                  ? 65535
+                                                                                  : tested;
+                                                                              pingOverrides.value = {...modalPing};
+                                                                              if (restoreTag != null &&
+                                                                                  restoreTag.isNotEmpty) {
+                                                                                await sheetRef
+                                                                                    .read(proxyRepositoryProvider)
+                                                                                    .selectProxy(groupTag, restoreTag)
+                                                                                    .run();
+                                                                              }
+                                                                              await _restoreAfterTest(
+                                                                                sheetRef,
+                                                                                wasConnected,
+                                                                              );
+                                                                            } finally {
+                                                                              modalPingLoading.remove(item.id);
+                                                                              pingLoading.value = {...modalPingLoading};
+                                                                              setModalState(() {});
+                                                                            }
+                                                                          },
+                                                                        ),
+                                                                        const SizedBox(width: 8),
+                                                                        _LatencyAction(
+                                                                          icon: Icons.bolt_rounded,
+                                                                          loading: linkBusy,
+                                                                          valueMs: item.linkMs,
+                                                                          timeoutText: tr('超时', 'timeout'),
+                                                                          onTap: () async {
+                                                                            final groupTag =
+                                                                                _readGroupTag(group) ?? 'select';
+                                                                            final restoreTag = _readSelectedTag(group);
+                                                                            modalLinkLoading.add(item.id);
+                                                                            setModalState(() {});
+                                                                            try {
+                                                                              final wasConnected =
+                                                                                  await _prepareTestConnection(
+                                                                                    sheetRef,
+                                                                                    context: context,
+                                                                                    zh: zh,
+                                                                                  );
+                                                                              if (wasConnected == null) {
+                                                                                return;
+                                                                              }
+                                                                              final tested = await _runLinkProbe(
+                                                                                sheetRef,
+                                                                                groupTag: groupTag,
+                                                                                outboundTag: item.testTag,
+                                                                                restoreTag: restoreTag,
+                                                                              );
+                                                                              modalLink[item.id] =
+                                                                                  tested == null || tested <= 0
+                                                                                  ? 65535
+                                                                                  : tested;
+                                                                              linkOverrides.value = {...modalLink};
+                                                                              await _restoreAfterTest(
+                                                                                sheetRef,
+                                                                                wasConnected,
+                                                                              );
+                                                                            } finally {
+                                                                              modalLinkLoading.remove(item.id);
+                                                                              linkLoading.value = {...modalLinkLoading};
+                                                                              setModalState(() {});
+                                                                            }
+                                                                          },
+                                                                        ),
+                                                                        if (selectedNode.value == item.selectTag) ...[
+                                                                          const SizedBox(width: 8),
+                                                                          const Icon(
+                                                                            Icons.check_rounded,
+                                                                            color: Color(0xFF5A3D89),
+                                                                            size: 20,
+                                                                          ),
+                                                                        ],
+                                                                      ],
+                                                                    ),
+                                                                    onTap: () => Navigator.of(ctx).pop(item.selectTag),
+                                                                  );
+                                                                },
                                                               ),
-                                                              onTap: () => Navigator.of(ctx).pop(item.selectTag),
-                                                            );
-                                                          },
-                                                        ),
                                                       ),
                                                     ],
                                                   ),
@@ -567,21 +717,175 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  Future<bool> _prepareTestConnection(WidgetRef ref) async {
+  Future<bool?> _prepareTestConnection(WidgetRef ref, {required BuildContext context, required bool zh}) async {
     final beforeConnected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
     if (beforeConnected) return true;
+
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(zh ? '进入测试模式' : 'Enter test mode'),
+            content: Text(
+              zh
+                  ? '将临时启动线路测试通道，测试后自动关闭，不会保持连接状态。是否继续？'
+                  : 'A temporary test tunnel will start and close automatically after testing. Continue?',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(zh ? '取消' : 'Cancel')),
+              FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(zh ? '继续' : 'Continue')),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) {
+      return null;
+    }
+
     await ref.read(connectionNotifierProvider.notifier).mayConnect();
     for (var i = 0; i < 16; i++) {
       final connected = ref.read(connectionNotifierProvider).valueOrNull == const Connected();
       if (connected) return false;
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
-    return false;
+    if (context.mounted) {
+      showV2etNotice(context, zh ? '测试通道启动失败' : 'Failed to start test tunnel', error: true);
+    }
+    return null;
   }
 
   Future<void> _restoreAfterTest(WidgetRef ref, bool wasConnected) async {
     if (wasConnected) return;
     await ref.read(connectionNotifierProvider.notifier).abortConnection();
+  }
+
+  Future<void> _openRenewDialog(BuildContext context) async {
+    final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(zh ? '套餐已到期' : 'Plan expired'),
+        content: Text(zh ? '请续费后再使用连接功能。' : 'Please renew to continue using connection.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(zh ? '取消' : 'Cancel')),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.go('/store');
+            },
+            child: Text(zh ? '去续费' : 'Renew now'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openResetDialog(
+    BuildContext context,
+    WidgetRef ref,
+    List<V2etStoreOffer> offers,
+    V2boardSession? session,
+    bool zh,
+  ) async {
+    var currentSession = session;
+    currentSession ??= await ref.read(v2etRepositoryProvider).restoreSession();
+    if (currentSession == null || !currentSession.hasToken) {
+      if (context.mounted) showV2etNotice(context, zh ? '请先登录账号' : 'Please login first', error: true);
+      return;
+    }
+
+    final resetPlans = offers.where((o) => (o.prices['reset'] ?? 0) >= 0).toList();
+    if (resetPlans.isEmpty) {
+      if (context.mounted) {
+        showV2etNotice(context, zh ? '当前暂无可重置流量套餐' : 'No reset package available', error: true);
+      }
+      return;
+    }
+
+    final picked = await showDialog<V2etStoreOffer>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(zh ? '选择重置流量套餐' : 'Select reset package'),
+        content: SizedBox(
+          width: 420,
+          height: 320,
+          child: ListView.builder(
+            itemCount: resetPlans.length,
+            itemBuilder: (_, i) {
+              final plan = resetPlans[i];
+              final price = plan.prices['reset'] ?? 0;
+              return ListTile(
+                title: Text(plan.name),
+                subtitle: Text('¥ ${price.toStringAsFixed(2)}'),
+                onTap: () => Navigator.of(dialogContext).pop(plan),
+              );
+            },
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(zh ? '取消' : 'Cancel'))],
+      ),
+    );
+    if (picked == null || picked.id == null) return;
+
+    try {
+      final api = ref.read(v2etPortalApiProvider);
+      final tradeNo = await api.createOrder(session: currentSession, planId: picked.id!, periodField: 'reset_price');
+      final price = picked.prices['reset'] ?? 0;
+      if (price <= 0) {
+        final result = await api.checkoutOrder(session: currentSession, tradeNo: tradeNo);
+        if (result.type == -1 && context.mounted) {
+          showV2etNotice(context, zh ? '重置流量成功' : 'Traffic reset successfully');
+        }
+        return;
+      }
+
+      final methods = await api.fetchPaymentMethods(currentSession);
+      if (methods.isEmpty) {
+        if (context.mounted) {
+          showV2etNotice(context, zh ? '暂无可用支付方式' : 'No payment method available', error: true);
+        }
+        return;
+      }
+      final method = await showDialog<V2etPaymentMethod>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(zh ? '选择支付方式' : 'Select payment method'),
+          content: SizedBox(
+            width: 320,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final m in methods) ListTile(title: Text(m.name), onTap: () => Navigator.of(dialogContext).pop(m)),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (method == null) return;
+      final checkout = await api.checkoutOrder(session: currentSession, tradeNo: tradeNo, paymentMethodId: method.id);
+      if (checkout.type == -1) {
+        if (context.mounted) showV2etNotice(context, zh ? '重置流量成功' : 'Traffic reset successfully');
+        return;
+      }
+      final uri = _resolveCheckoutUri(checkout.data);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (context.mounted) {
+          showV2etNotice(context, zh ? '已打开支付页面，完成后可返回客户端' : 'Payment page opened, return after completion');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) showV2etNotice(context, (zh ? '下单失败: ' : 'Checkout failed: ') + e.toString(), error: true);
+    }
+  }
+
+  Uri? _resolveCheckoutUri(String data) {
+    final raw = data.trim();
+    if (raw.isEmpty) return null;
+    final direct = Uri.tryParse(raw);
+    if (direct != null && direct.hasScheme) return direct;
+    final qrData = Uri.encodeComponent(raw);
+    return Uri.parse('https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=$qrData');
   }
 
   String _flagForTag(String tag) {

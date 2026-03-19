@@ -36,6 +36,7 @@ Current runtime keys tracked in app:
 - `builtin_proxy.enabled` (内置代理开关)
 - `ports.allow_custom` / `ports.default` (端口自定义策略)
 - `links.official_site` / `links.join_group` / `links.invite_manage` / `links.gift_card_help` (我的页外链配置)
+- `alerts.expiry_warn_days` / `alerts.traffic_warn_gb` / `alerts.traffic_warn_bytes` (到期与低流量预警阈值，远程热更新)
 
 Runtime compatibility aliases currently supported:
 

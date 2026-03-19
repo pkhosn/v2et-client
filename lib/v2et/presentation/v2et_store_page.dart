@@ -90,11 +90,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 980
-                      ? 3
-                      : constraints.maxWidth >= 760
-                      ? 2
-                      : 1;
+                  final columns = compact ? (constraints.maxWidth >= 760 ? 2 : 1) : 3;
                   final spacing = 12.0;
                   final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
 

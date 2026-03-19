@@ -17,6 +17,10 @@
     "script_url": "",
     "embed_html": ""
   },
+  "alerts": {
+    "expiry_warn_days": 3,
+    "traffic_warn_gb": 3
+  },
   "builtin_proxy": {
     "enabled": false
   },

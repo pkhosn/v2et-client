@@ -5,7 +5,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/locale_extensions.dart';
 import 'package:hiddify/core/localization/locale_preferences.dart';
-import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/gen/translations.g.dart';
@@ -103,9 +102,9 @@ class V2etLoginPage extends HookConsumerWidget {
           ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((
             error,
           ) {
-            ref
-                .read(inAppNotificationControllerProvider)
-                .showErrorToast(tr('订阅导入失败: ', 'Subscription import failed: ') + error.toString());
+            if (context.mounted) {
+              showV2etNotice(context, tr('订阅导入失败: ', 'Subscription import failed: ') + error.toString(), error: true);
+            }
           }),
         );
         if (!context.mounted) return;
@@ -113,7 +112,9 @@ class V2etLoginPage extends HookConsumerWidget {
         context.go('/home');
       } catch (e) {
         final message = _friendlyLoginError(e, zh);
-        ref.read(inAppNotificationControllerProvider).showErrorToast(message);
+        if (context.mounted) {
+          showV2etNotice(context, message, error: true);
+        }
       } finally {
         loading.value = false;
       }

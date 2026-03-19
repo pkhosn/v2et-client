@@ -165,12 +165,12 @@ class V2etPortalApi {
   Future<V2etCheckoutResult> checkoutOrder({
     required V2boardSession session,
     required String tradeNo,
-    required int paymentMethodId,
+    int? paymentMethodId,
   }) async {
     final checkout = await _authPost(
       session,
       '/api/v1/user/order/checkout',
-      data: {'trade_no': tradeNo, 'method': paymentMethodId},
+      data: {'trade_no': tradeNo, if (paymentMethodId != null) 'method': paymentMethodId},
     );
     final type = _readInt(_readMapNullable(checkout['data'])?['type'] ?? checkout['type']) ?? -1;
     final data = _readString(_readMapNullable(checkout['data'])?['data'] ?? checkout['data']) ?? '';

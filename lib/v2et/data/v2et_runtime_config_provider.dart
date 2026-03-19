@@ -20,6 +20,8 @@ class V2etRuntimeConfig {
     required this.supportUrl,
     required this.supportScriptUrl,
     required this.supportEmbedHtml,
+    required this.expiryWarnDays,
+    required this.trafficWarnBytes,
   });
 
   final bool enableNoticePopup;
@@ -38,6 +40,8 @@ class V2etRuntimeConfig {
   final String? supportUrl;
   final String? supportScriptUrl;
   final String? supportEmbedHtml;
+  final int expiryWarnDays;
+  final int trafficWarnBytes;
 }
 
 class V2etRuntimeBanner {
@@ -75,6 +79,8 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
         supportUrl: null,
         supportScriptUrl: null,
         supportEmbedHtml: null,
+        expiryWarnDays: 3,
+        trafficWarnBytes: 3 * 1024 * 1024 * 1024,
       );
     }
 
@@ -150,6 +156,24 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       'v2et.support.embed_html',
       'support.html',
     ]);
+    final expiryWarnDays =
+        _readIntByPaths(map, const [
+          'alerts.expiry_warn_days',
+          'alerts.expire_warn_days',
+          'alerts.expire_days',
+          'features.alerts.expiry_warn_days',
+          'v2et.alerts.expiry_warn_days',
+        ]) ??
+        3;
+    final trafficWarnBytes =
+        _readIntByPaths(map, const [
+          'alerts.traffic_warn_bytes',
+          'alerts.remaining_traffic_bytes',
+          'features.alerts.traffic_warn_bytes',
+          'v2et.alerts.traffic_warn_bytes',
+        ]) ??
+        _readTrafficWarnBytesByGb(map) ??
+        (3 * 1024 * 1024 * 1024);
 
     return V2etRuntimeConfig(
       enableNoticePopup: enabled ?? true,
@@ -168,6 +192,8 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       supportUrl: supportUrl,
       supportScriptUrl: supportScriptUrl,
       supportEmbedHtml: supportEmbedHtml,
+      expiryWarnDays: expiryWarnDays,
+      trafficWarnBytes: trafficWarnBytes,
     );
   } catch (_) {
     return const V2etRuntimeConfig(
@@ -187,9 +213,38 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       supportUrl: null,
       supportScriptUrl: null,
       supportEmbedHtml: null,
+      expiryWarnDays: 3,
+      trafficWarnBytes: 3 * 1024 * 1024 * 1024,
     );
   }
 });
+
+int? _readTrafficWarnBytesByGb(Map<String, dynamic> root) {
+  final value = _readPathByPaths(root, const [
+    'alerts.traffic_warn_gb',
+    'alerts.remaining_traffic_gb',
+    'features.alerts.traffic_warn_gb',
+    'v2et.alerts.traffic_warn_gb',
+  ]);
+  if (value is num) {
+    return (value * 1024 * 1024 * 1024).toInt();
+  }
+  if (value is String) {
+    final parsed = num.tryParse(value.trim());
+    if (parsed != null) {
+      return (parsed * 1024 * 1024 * 1024).toInt();
+    }
+  }
+  return null;
+}
+
+Object? _readPathByPaths(Map<String, dynamic> root, List<String> paths) {
+  for (final path in paths) {
+    final value = _readPath(root, path);
+    if (value != null) return value;
+  }
+  return null;
+}
 
 Map<String, dynamic>? _asMap(Object? value) {
   if (value is Map<String, dynamic>) return value;

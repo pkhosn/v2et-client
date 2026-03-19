@@ -113,12 +113,12 @@ class V2etMePage extends HookConsumerWidget {
         case 'logout':
           final shouldLogout = await showDialog<bool>(
             context: context,
-            builder: (_) => AlertDialog(
+            builder: (dialogContext) => AlertDialog(
               title: Text(tr('退出登录', 'Logout')),
               content: Text(tr('确认退出当前账号？', 'Are you sure you want to logout?')),
               actions: [
-                TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(tr('取消', 'Cancel'))),
-                FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(tr('确定', 'Confirm'))),
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(tr('取消', 'Cancel'))),
+                FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(tr('确定', 'Confirm'))),
               ],
             ),
           );

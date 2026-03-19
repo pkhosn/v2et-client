@@ -44,9 +44,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final selectedNode = useState<String?>(null);
     final noticeShown = useState(false);
     final statusNotifiedKey = useState<String?>(null);
-    final pingOverrides = useState<Map<String, int?>>({});
     final linkOverrides = useState<Map<String, int?>>({});
-    final pingLoading = useState<Set<String>>({});
     final linkLoading = useState<Set<String>>({});
 
     final remoteInfo = activeProfile is RemoteProfileEntity ? activeProfile.subInfo : null;
@@ -271,9 +269,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                           ? MediaQuery.of(ctx).size.height * 0.75
                                           : MediaQuery.of(ctx).size.height * 0.62;
                                       final sheetHeight = estimatedHeight.clamp(260.0, maxAllowed);
-                                      final modalPing = <String, int?>{...pingOverrides.value};
                                       final modalLink = <String, int?>{...linkOverrides.value};
-                                      final modalPingLoading = <String>{...pingLoading.value};
                                       final modalLinkLoading = <String>{...linkLoading.value};
 
                                       return StatefulBuilder(
@@ -281,7 +277,6 @@ class V2etDashboardPage extends HookConsumerWidget {
                                           final entries = _buildNodeEntries(
                                             tags,
                                             group,
-                                            pingOverrides: modalPing,
                                             linkOverrides: modalLink,
                                             zh: zh,
                                           );
@@ -290,7 +285,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                               child: ConstrainedBox(
                                                 constraints: BoxConstraints(maxWidth: maxWidth),
                                                 child: Padding(
-                                                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                                                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
                                                   child: SizedBox(
                                                     height: sheetHeight,
                                                     child: Column(
@@ -309,13 +304,9 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                             const Spacer(),
                                                             OutlinedButton.icon(
                                                               onPressed: () {
-                                                                modalPing.clear();
                                                                 modalLink.clear();
-                                                                modalPingLoading.clear();
                                                                 modalLinkLoading.clear();
-                                                                pingOverrides.value = {};
                                                                 linkOverrides.value = {};
-                                                                pingLoading.value = {};
                                                                 linkLoading.value = {};
                                                                 sheetRef.invalidate(proxiesOverviewNotifierProvider);
                                                                 setModalState(() {});
@@ -330,7 +321,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                             ),
                                                           ],
                                                         ),
-                                                        const SizedBox(height: 8),
+                                                        const SizedBox(height: 4),
                                                         Expanded(
                                                           child: guard == _UsageGuard.expired
                                                               ? Center(
@@ -367,7 +358,6 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                   separatorBuilder: (_, _) => const Divider(height: 1),
                                                                   itemBuilder: (_, i) {
                                                                     final item = entries[i];
-                                                                    final pingBusy = modalPingLoading.contains(item.id);
                                                                     final linkBusy = modalLinkLoading.contains(item.id);
                                                                     return ListTile(
                                                                       dense: true,
@@ -379,73 +369,14 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                       trailing: Row(
                                                                         mainAxisSize: MainAxisSize.min,
                                                                         children: [
-                                                                          _LatencyAction(
-                                                                            icon: Icons.network_ping_rounded,
-                                                                            loading: pingBusy,
-                                                                            valueMs: item.pingMs,
-                                                                            timeoutText: tr('超时', 'timeout'),
-                                                                            onTap: () async {
-                                                                              modalPingLoading.add(item.id);
-                                                                              setModalState(() {});
-                                                                              try {
-                                                                                final groupTag =
-                                                                                    _readGroupTag(group) ?? 'select';
-                                                                                final restoreTag = _readSelectedTag(
-                                                                                  group,
-                                                                                );
-                                                                                final wasConnected =
-                                                                                    await _prepareTestConnection(
-                                                                                      sheetRef,
-                                                                                    );
-                                                                                if (wasConnected == null) {
-                                                                                  return;
-                                                                                }
-                                                                                await sheetRef
-                                                                                    .read(proxyRepositoryProvider)
-                                                                                    .selectProxy(groupTag, item.testTag)
-                                                                                    .run();
-                                                                                await sheetRef
-                                                                                    .read(
-                                                                                      proxiesOverviewNotifierProvider
-                                                                                          .notifier,
-                                                                                    )
-                                                                                    .urlTest(groupTag);
-                                                                                final refreshed = sheetRef
-                                                                                    .read(
-                                                                                      proxiesOverviewNotifierProvider,
-                                                                                    )
-                                                                                    .valueOrNull;
-                                                                                final tested =
-                                                                                    _readDelayForTag(
-                                                                                      refreshed,
-                                                                                      item.testTag,
-                                                                                    ) ??
-                                                                                    65535;
-                                                                                modalPing[item.id] = tested <= 0
-                                                                                    ? 65535
-                                                                                    : tested;
-                                                                                pingOverrides.value = {...modalPing};
-                                                                                if (restoreTag != null &&
-                                                                                    restoreTag.isNotEmpty) {
-                                                                                  await sheetRef
-                                                                                      .read(proxyRepositoryProvider)
-                                                                                      .selectProxy(groupTag, restoreTag)
-                                                                                      .run();
-                                                                                }
-                                                                                await _restoreAfterTest(
-                                                                                  sheetRef,
-                                                                                  wasConnected,
-                                                                                );
-                                                                              } finally {
-                                                                                modalPingLoading.remove(item.id);
-                                                                                pingLoading.value = {
-                                                                                  ...modalPingLoading,
-                                                                                };
-                                                                                setModalState(() {});
-                                                                              }
-                                                                            },
-                                                                          ),
-                                                                          const SizedBox(width: 8),
+                                                                          if (selectedNode.value == item.selectTag) ...[
+                                                                            const Icon(
+                                                                              Icons.check_rounded,
+                                                                              color: Color(0xFF5A3D89),
+                                                                              size: 20,
+                                                                            ),
+                                                                            const SizedBox(width: 8),
+                                                                          ],
                                                                           _LatencyAction(
                                                                             icon: Icons.bolt_rounded,
                                                                             loading: linkBusy,
@@ -491,14 +422,6 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                               }
                                                                             },
                                                                           ),
-                                                                          if (selectedNode.value == item.selectTag) ...[
-                                                                            const SizedBox(width: 8),
-                                                                            const Icon(
-                                                                              Icons.check_rounded,
-                                                                              color: Color(0xFF5A3D89),
-                                                                              size: 20,
-                                                                            ),
-                                                                          ],
                                                                         ],
                                                                       ),
                                                                       onTap: () =>
@@ -620,7 +543,6 @@ class V2etDashboardPage extends HookConsumerWidget {
   List<_NodeEntry> _buildNodeEntries(
     List<String> tags,
     dynamic proxyGroup, {
-    required Map<String, int?> pingOverrides,
     required Map<String, int?> linkOverrides,
     required bool zh,
   }) {
@@ -659,7 +581,6 @@ class V2etDashboardPage extends HookConsumerWidget {
         flag: '⚡',
         selectTag: autoSelectTag ?? currentGroupTag,
         testTag: autoSelectTag ?? currentGroupTag,
-        pingMs: pingOverrides['__auto__'],
         linkMs: linkOverrides['__auto__'],
         isSpecial: true,
       ),
@@ -671,7 +592,6 @@ class V2etDashboardPage extends HookConsumerWidget {
         flag: '🛡️',
         selectTag: failoverTag ?? currentGroupTag,
         testTag: failoverTag ?? currentGroupTag,
-        pingMs: pingOverrides['__failover__'],
         linkMs: linkOverrides['__failover__'],
         isSpecial: true,
       ),
@@ -685,7 +605,6 @@ class V2etDashboardPage extends HookConsumerWidget {
           flag: _flagForTag(tag),
           selectTag: tag,
           testTag: tag,
-          pingMs: pingOverrides[tag],
           linkMs: linkOverrides[tag],
           isSpecial: false,
         );
@@ -950,7 +869,6 @@ class _NodeEntry {
     required this.flag,
     required this.selectTag,
     required this.testTag,
-    required this.pingMs,
     required this.linkMs,
     required this.isSpecial,
   });
@@ -960,7 +878,6 @@ class _NodeEntry {
   final String flag;
   final String selectTag;
   final String testTag;
-  final int? pingMs;
   final int? linkMs;
   final bool isSpecial;
 }
@@ -1002,10 +919,9 @@ class _LatencyAction extends StatelessWidget {
             children: [
               if (loading)
                 SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6, color: fg))
-              else
+              else if (!hasValue)
                 Icon(icon, size: 14, color: fg),
               if (hasValue) ...[
-                const SizedBox(width: 4),
                 Text(
                   timedOut ? timeoutText : '${valueMs}ms',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),

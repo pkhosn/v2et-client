@@ -1,14 +1,18 @@
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 
+const _fallbackCrispId = 'b5c272e7-4f9b-4417-b206-854f2a1fe194';
+
 Uri? buildV2etSupportUri(V2etRuntimeConfig? config) {
-  if (config == null) return null;
+  if (config == null) {
+    return Uri.parse('https://go.crisp.chat/chat/embed/?website_id=$_fallbackCrispId');
+  }
 
   final direct = _parseUri(config.supportUrl);
   if (direct != null) {
     return direct;
   }
 
-  final crispId = (config.crispWebsiteId ?? '').trim();
+  final crispId = (config.crispWebsiteId ?? _fallbackCrispId).trim();
   if (crispId.isNotEmpty) {
     return Uri.parse('https://go.crisp.chat/chat/embed/?website_id=$crispId');
   }

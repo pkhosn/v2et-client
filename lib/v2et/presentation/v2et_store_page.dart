@@ -16,8 +16,6 @@ class V2etStorePage extends ConsumerStatefulWidget {
 }
 
 class _V2etStorePageState extends ConsumerState<V2etStorePage> {
-  String _selectedBilling = 'all';
-
   @override
   Widget build(BuildContext context) {
     final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
@@ -25,11 +23,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
     String tr(String a, String b) => zh ? a : b;
 
     final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const [];
-    final visibleOffers = offers.where((offer) {
-      if (_selectedBilling == 'all') return true;
-      if (_selectedBilling == 'recurring') return !offer.isOnetimeOnly;
-      return offer.isOnetimeOnly;
-    }).toList();
+    final visibleOffers = offers;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2F8),
@@ -38,46 +32,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
           padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, 16),
           children: [
             Row(
-              children: [
-                Text(tr('商店', 'Store'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                const Spacer(),
-                IconButton(
-                  onPressed: () {
-                    ref.invalidate(v2etStoreOffersProvider);
-                  },
-                  icon: const Icon(Icons.refresh_rounded, color: Color(0xFF342F3E)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(color: const Color(0xFFE8E3EE), borderRadius: BorderRadius.circular(24)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _FilterPill(
-                      label: tr('全部', 'All'),
-                      icon: Icons.link_rounded,
-                      selected: _selectedBilling == 'all',
-                      onTap: () => setState(() => _selectedBilling = 'all'),
-                    ),
-                    _FilterPill(
-                      label: tr('周期性', 'Recurring'),
-                      icon: Icons.autorenew_rounded,
-                      selected: _selectedBilling == 'recurring',
-                      onTap: () => setState(() => _selectedBilling = 'recurring'),
-                    ),
-                    _FilterPill(
-                      label: tr('一次性', 'One-time'),
-                      icon: Icons.calendar_today_outlined,
-                      selected: _selectedBilling == 'onetime',
-                      onTap: () => setState(() => _selectedBilling = 'onetime'),
-                    ),
-                  ],
-                ),
-              ),
+              children: [Text(tr('商店', 'Store'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700))],
             ),
             const SizedBox(height: 14),
             if (visibleOffers.isEmpty)
@@ -512,43 +467,5 @@ class _OfferCard extends ConsumerWidget {
       'reset' => 'reset_price',
       _ => 'month_price',
     };
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({required this.label, required this.icon, required this.selected, required this.onTap});
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF5A3D89) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: selected ? Colors.white : const Color(0xFF3A3545)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF3A3545),
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

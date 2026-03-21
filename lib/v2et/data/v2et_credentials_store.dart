@@ -5,9 +5,11 @@ import 'package:hiddify/v2et/model/v2board_subscription.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class V2etCredentialsStore {
-  const V2etCredentialsStore({required SharedPreferences preferences, required FlutterSecureStorage secureStorage})
-    : _preferences = preferences,
-      _secureStorage = secureStorage;
+  const V2etCredentialsStore({
+    required SharedPreferences preferences,
+    required FlutterSecureStorage secureStorage,
+  }) : _preferences = preferences,
+       _secureStorage = secureStorage;
 
   final SharedPreferences _preferences;
   final FlutterSecureStorage _secureStorage;
@@ -41,7 +43,8 @@ class V2etCredentialsStore {
   Future<V2boardCredentials?> readCredentials() async {
     final baseUrlRaw = _preferences.getString(_baseUrlKey);
     final email = _preferences.getString(_emailKey);
-    final password = await _readSecure(_passwordKey) ?? _preferences.getString(_passwordKey);
+    final password =
+        await _readSecure(_passwordKey) ?? _preferences.getString(_passwordKey);
     if (baseUrlRaw == null || email == null || password == null) {
       return null;
     }
@@ -55,7 +58,8 @@ class V2etCredentialsStore {
   Future<V2boardSession?> readSession() async {
     final baseUrlRaw = _preferences.getString(_baseUrlKey);
     final baseUrl = baseUrlRaw == null ? null : Uri.tryParse(baseUrlRaw);
-    final token = await _readSecure(_tokenKey) ?? _preferences.getString(_tokenKey);
+    final token =
+        await _readSecure(_tokenKey) ?? _preferences.getString(_tokenKey);
     if (baseUrl == null || token == null || token.isEmpty) {
       return null;
     }
@@ -63,7 +67,11 @@ class V2etCredentialsStore {
     final createdAt = createdAtRaw == null
         ? DateTime.now().toUtc()
         : DateTime.tryParse(createdAtRaw) ?? DateTime.now().toUtc();
-    return V2boardSession(baseUrl: baseUrl, accessToken: token, createdAt: createdAt);
+    return V2boardSession(
+      baseUrl: baseUrl,
+      accessToken: token,
+      createdAt: createdAt,
+    );
   }
 
   Future<void> saveCredentials(V2boardCredentials credentials) async {
@@ -76,14 +84,19 @@ class V2etCredentialsStore {
   Future<void> saveSession(V2boardSession session) async {
     await _writeSecure(_tokenKey, session.accessToken);
     await _preferences.setString(_tokenKey, session.accessToken);
-    await _preferences.setString(_tokenAtKey, session.createdAt.toUtc().toIso8601String());
+    await _preferences.setString(
+      _tokenAtKey,
+      session.createdAt.toUtc().toIso8601String(),
+    );
   }
 
   V2boardSubscription? readLastSubscription() {
     final subUrlRaw = _preferences.getString(_subUrlKey);
     final fetchedAtRaw = _preferences.getString(_subFetchedAtKey);
     final subUrl = subUrlRaw == null ? null : Uri.tryParse(subUrlRaw);
-    final fetchedAt = fetchedAtRaw == null ? null : DateTime.tryParse(fetchedAtRaw);
+    final fetchedAt = fetchedAtRaw == null
+        ? null
+        : DateTime.tryParse(fetchedAtRaw);
     if (subUrl == null || fetchedAt == null) {
       return null;
     }
@@ -91,7 +104,9 @@ class V2etCredentialsStore {
     final planName = _preferences.getString(_planNameKey);
     final transferEnable = _preferences.getInt(_transferEnableKey);
     final expiredAtRaw = _preferences.getString(_expiredAtKey);
-    final expiredAt = expiredAtRaw == null ? null : DateTime.tryParse(expiredAtRaw);
+    final expiredAt = expiredAtRaw == null
+        ? null
+        : DateTime.tryParse(expiredAtRaw);
     final nodeCount = _preferences.getInt(_nodeCountKey);
     return V2boardSubscription(
       subscriptionUrl: subUrl,
@@ -104,20 +119,32 @@ class V2etCredentialsStore {
   }
 
   Future<void> saveLastSubscription(V2boardSubscription subscription) async {
-    await _preferences.setString(_subUrlKey, subscription.subscriptionUrl.toString());
-    await _preferences.setString(_subFetchedAtKey, subscription.fetchedAt.toUtc().toIso8601String());
+    await _preferences.setString(
+      _subUrlKey,
+      subscription.subscriptionUrl.toString(),
+    );
+    await _preferences.setString(
+      _subFetchedAtKey,
+      subscription.fetchedAt.toUtc().toIso8601String(),
+    );
     if (subscription.planName != null) {
       await _preferences.setString(_planNameKey, subscription.planName!);
     } else {
       await _preferences.remove(_planNameKey);
     }
     if (subscription.transferEnableBytes != null) {
-      await _preferences.setInt(_transferEnableKey, subscription.transferEnableBytes!);
+      await _preferences.setInt(
+        _transferEnableKey,
+        subscription.transferEnableBytes!,
+      );
     } else {
       await _preferences.remove(_transferEnableKey);
     }
     if (subscription.expiredAt != null) {
-      await _preferences.setString(_expiredAtKey, subscription.expiredAt!.toUtc().toIso8601String());
+      await _preferences.setString(
+        _expiredAtKey,
+        subscription.expiredAt!.toUtc().toIso8601String(),
+      );
     } else {
       await _preferences.remove(_expiredAtKey);
     }

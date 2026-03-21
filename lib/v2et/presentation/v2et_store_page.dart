@@ -18,7 +18,9 @@ class V2etStorePage extends ConsumerStatefulWidget {
 class _V2etStorePageState extends ConsumerState<V2etStorePage> {
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
+    final zh = Localizations.localeOf(
+      context,
+    ).languageCode.toLowerCase().startsWith('zh');
     final compact = MediaQuery.sizeOf(context).width < 720;
     String tr(String a, String b) => zh ? a : b;
 
@@ -29,25 +31,45 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
       backgroundColor: const Color(0xFFF5F2F8),
       body: SafeArea(
         child: ListView(
-          padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, 16),
+          padding: EdgeInsets.fromLTRB(
+            compact ? 12 : 20,
+            compact ? 8 : 14,
+            compact ? 12 : 20,
+            16,
+          ),
           children: [
             Row(
-              children: [Text(tr('商店', 'Store'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700))],
+              children: [
+                Text(
+                  tr('商店', 'Store'),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             if (visibleOffers.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 28),
                 child: Center(
-                  child: Text(tr('暂无套餐数据', 'No plans available yet'), style: const TextStyle(color: Color(0xFF514C59))),
+                  child: Text(
+                    tr('暂无套餐数据', 'No plans available yet'),
+                    style: const TextStyle(color: Color(0xFF514C59)),
+                  ),
                 ),
               )
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = compact ? (constraints.maxWidth >= 760 ? 2 : 1) : 3;
+                  final columns = compact
+                      ? (constraints.maxWidth >= 760 ? 2 : 1)
+                      : 3;
                   final spacing = 12.0;
-                  final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                  final width =
+                      (constraints.maxWidth - spacing * (columns - 1)) /
+                      columns;
 
                   return Wrap(
                     spacing: spacing,
@@ -97,7 +119,10 @@ class _OfferCard extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             color: const Color(0xFFECE8F3),
-            child: Text(offer.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+            child: Text(
+              offer.name,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
           ),
           Container(
             width: double.infinity,
@@ -111,19 +136,35 @@ class _OfferCard extends ConsumerWidget {
                     children: [
                       const TextSpan(
                         text: '¥ ',
-                        style: TextStyle(color: Color(0xFF2F2A39), fontSize: 20, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Color(0xFF2F2A39),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       TextSpan(
-                        text: mainPrice == null ? '0.00' : mainPrice.$2.toStringAsFixed(2),
-                        style: const TextStyle(color: Color(0xFF1D2636), fontSize: 36, fontWeight: FontWeight.w800),
+                        text: mainPrice == null
+                            ? '0.00'
+                            : mainPrice.$2.toStringAsFixed(2),
+                        style: const TextStyle(
+                          color: Color(0xFF1D2636),
+                          fontSize: 36,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  mainPrice == null ? tr('未定义周期', 'Undefined period') : _periodLabel(mainPrice.$1),
-                  style: const TextStyle(color: Color(0xFF4E4957), fontSize: 20, fontWeight: FontWeight.w500),
+                  mainPrice == null
+                      ? tr('未定义周期', 'Undefined period')
+                      : _periodLabel(mainPrice.$1),
+                  style: const TextStyle(
+                    color: Color(0xFF4E4957),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -135,7 +176,14 @@ class _OfferCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(description, style: const TextStyle(color: Color(0xFF2D2737), fontSize: 15, height: 1.5)),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: Color(0xFF2D2737),
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -144,22 +192,41 @@ class _OfferCard extends ConsumerWidget {
                       backgroundColor: const Color(0xFFBDECF2),
                       foregroundColor: const Color(0xFF195A65),
                       minimumSize: const Size.fromHeight(40),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 22,
+                      ),
                     ),
                     onPressed: () async {
-                      V2boardSession? session = ref.read(v2etSessionProvider).valueOrNull;
-                      session ??= await ref.read(v2etRepositoryProvider).restoreSession();
-                      if (session == null || !session.hasToken || offer.id == null) {
+                      V2boardSession? session = ref
+                          .read(v2etSessionProvider)
+                          .valueOrNull;
+                      session ??= await ref
+                          .read(v2etRepositoryProvider)
+                          .restoreSession();
+                      if (session == null ||
+                          !session.hasToken ||
+                          offer.id == null) {
                         if (!context.mounted) return;
-                        showV2etNotice(context, tr('请先登录后购买', 'Please login before purchase'), error: true);
+                        showV2etNotice(
+                          context,
+                          tr('请先登录后购买', 'Please login before purchase'),
+                          error: true,
+                        );
                         return;
                       }
 
                       final period = await _pickPeriod(context, allPrices);
                       if (period == null || !context.mounted) return;
 
-                      final method = await _pickPaymentMethod(context, ref, session);
+                      final method = await _pickPaymentMethod(
+                        context,
+                        ref,
+                        session,
+                      );
                       if (method == null || !context.mounted) return;
 
                       await _startCheckout(
@@ -187,14 +254,20 @@ class _OfferCard extends ConsumerWidget {
                     .skip(1)
                     .map(
                       (e) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE9E4EF),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           '${_periodLabel(e.$1)} ¥${e.$2.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF3F3A49)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF3F3A49),
+                          ),
                         ),
                       ),
                     )
@@ -207,9 +280,20 @@ class _OfferCard extends ConsumerWidget {
   }
 
   List<(String, double)> _priceEntries(V2etStoreOffer c) {
-    const order = ['month', 'quarter', 'half_year', 'year', 'two_year', 'three_year', 'onetime', 'reset'];
+    const order = [
+      'month',
+      'quarter',
+      'half_year',
+      'year',
+      'two_year',
+      'three_year',
+      'onetime',
+      'reset',
+    ];
     final entries = c.prices.entries.toList();
-    entries.sort((a, b) => order.indexOf(a.key).compareTo(order.indexOf(b.key)));
+    entries.sort(
+      (a, b) => order.indexOf(a.key).compareTo(order.indexOf(b.key)),
+    );
     return entries.map((e) => (e.key, e.value)).toList();
   }
 
@@ -242,10 +326,15 @@ class _OfferCard extends ConsumerWidget {
       lines.add(tr('速率: ', 'Speed: ') + offer.speed!.trim());
     }
     if (offer.deviceLimit != null) {
-      lines.add(tr('设备限制: ', 'Device limit: ') + '${offer.deviceLimit}${tr('台', '')}');
+      lines.add(
+        tr('设备限制: ', 'Device limit: ') + '${offer.deviceLimit}${tr('台', '')}',
+      );
     }
     if (lines.isEmpty) {
-      return tr('高速稳定网络服务，适配多终端场景。', 'Fast and stable network service for multi-device usage.');
+      return tr(
+        '高速稳定网络服务，适配多终端场景。',
+        'Fast and stable network service for multi-device usage.',
+      );
     }
     return lines.join('\n');
   }
@@ -261,7 +350,10 @@ class _OfferCard extends ConsumerWidget {
     return '${size.toStringAsFixed(size >= 100 ? 0 : 2)} ${units[unit]}';
   }
 
-  Future<String?> _pickPeriod(BuildContext context, List<(String, double)> prices) async {
+  Future<String?> _pickPeriod(
+    BuildContext context,
+    List<(String, double)> prices,
+  ) async {
     if (prices.isEmpty) return null;
     if (prices.length == 1) return prices.first.$1;
     return showDialog<String>(
@@ -283,17 +375,32 @@ class _OfferCard extends ConsumerWidget {
               ],
             ),
           ),
-          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr('取消', 'Cancel')))],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(tr('取消', 'Cancel')),
+            ),
+          ],
         );
       },
     );
   }
 
-  Future<V2etPaymentMethod?> _pickPaymentMethod(BuildContext context, WidgetRef ref, V2boardSession session) async {
-    final methods = await ref.read(v2etPortalApiProvider).fetchPaymentMethods(session);
+  Future<V2etPaymentMethod?> _pickPaymentMethod(
+    BuildContext context,
+    WidgetRef ref,
+    V2boardSession session,
+  ) async {
+    final methods = await ref
+        .read(v2etPortalApiProvider)
+        .fetchPaymentMethods(session);
     if (!context.mounted) return null;
     if (methods.isEmpty) {
-      showV2etNotice(context, tr('暂无可用支付方式', 'No payment method available'), error: true);
+      showV2etNotice(
+        context,
+        tr('暂无可用支付方式', 'No payment method available'),
+        error: true,
+      );
       return null;
     }
     return showDialog<V2etPaymentMethod>(
@@ -307,11 +414,19 @@ class _OfferCard extends ConsumerWidget {
               shrinkWrap: true,
               children: [
                 for (final method in methods)
-                  ListTile(title: Text(method.name), onTap: () => Navigator.of(ctx).pop(method)),
+                  ListTile(
+                    title: Text(method.name),
+                    onTap: () => Navigator.of(ctx).pop(method),
+                  ),
               ],
             ),
           ),
-          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(tr('取消', 'Cancel')))],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(tr('取消', 'Cancel')),
+            ),
+          ],
         );
       },
     );
@@ -327,8 +442,16 @@ class _OfferCard extends ConsumerWidget {
   }) async {
     try {
       final api = ref.read(v2etPortalApiProvider);
-      final tradeNo = await api.createOrder(session: session, planId: planId, periodField: _periodField(period));
-      final checkout = await api.checkoutOrder(session: session, tradeNo: tradeNo, paymentMethodId: paymentMethod.id);
+      final tradeNo = await api.createOrder(
+        session: session,
+        planId: planId,
+        periodField: _periodField(period),
+      );
+      final checkout = await api.checkoutOrder(
+        session: session,
+        tradeNo: tradeNo,
+        paymentMethodId: paymentMethod.id,
+      );
       if (!context.mounted) return;
 
       if (checkout.type == -1) {
@@ -337,10 +460,20 @@ class _OfferCard extends ConsumerWidget {
         return;
       }
 
-      await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);
+      await _showPaymentDialog(
+        context: context,
+        ref: ref,
+        session: session,
+        tradeNo: tradeNo,
+        checkout: checkout,
+      );
     } catch (e) {
       if (!context.mounted) return;
-      showV2etNotice(context, tr('下单失败: ', 'Checkout failed: ') + e.toString(), error: true);
+      showV2etNotice(
+        context,
+        tr('下单失败: ', 'Checkout failed: ') + e.toString(),
+        error: true,
+      );
     }
   }
 
@@ -359,7 +492,9 @@ class _OfferCard extends ConsumerWidget {
     }
 
     final qrData = Uri.encodeComponent(raw);
-    return Uri.parse('https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=$qrData');
+    return Uri.parse(
+      'https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=$qrData',
+    );
   }
 
   Future<void> _showPaymentDialog({
@@ -393,14 +528,24 @@ class _OfferCard extends ConsumerWidget {
                     Navigator.of(dialogContext).pop();
                   }
                   if (context.mounted) {
-                    showV2etNotice(context, tr('支付成功，套餐已生效', 'Payment successful, plan activated'));
+                    showV2etNotice(
+                      context,
+                      tr('支付成功，套餐已生效', 'Payment successful, plan activated'),
+                    );
                   }
                 } else if (innerContext.mounted) {
-                  showV2etNotice(innerContext, tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'));
+                  showV2etNotice(
+                    innerContext,
+                    tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'),
+                  );
                 }
               } catch (e) {
                 if (innerContext.mounted) {
-                  showV2etNotice(innerContext, tr('查询订单失败: ', 'Order check failed: ') + e.toString(), error: true);
+                  showV2etNotice(
+                    innerContext,
+                    tr('查询订单失败: ', 'Order check failed: ') + e.toString(),
+                    error: true,
+                  );
                 }
               } finally {
                 if (dialogContext.mounted) {
@@ -427,7 +572,9 @@ class _OfferCard extends ConsumerWidget {
                         ),
                       )
                     else if (paymentUri != null) ...[
-                      Text(tr('请扫码或打开链接完成付款', 'Scan QR code or open link to pay')),
+                      Text(
+                        tr('请扫码或打开链接完成付款', 'Scan QR code or open link to pay'),
+                      ),
                       const SizedBox(height: 10),
                       Center(
                         child: Image.network(
@@ -438,31 +585,49 @@ class _OfferCard extends ConsumerWidget {
                         ),
                       ),
                     ] else
-                      Text(tr('支付数据无效，请网页支付', 'Invalid payment payload, please pay in web browser')),
+                      Text(
+                        tr(
+                          '支付数据无效，请网页支付',
+                          'Invalid payment payload, please pay in web browser',
+                        ),
+                      ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('稍后支付', 'Later'))),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(tr('稍后支付', 'Later')),
+                ),
                 if (raw.isNotEmpty)
                   TextButton(
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: raw));
                       if (!innerContext.mounted) return;
-                      showV2etNotice(innerContext, tr('支付信息已复制', 'Payment info copied'));
+                      showV2etNotice(
+                        innerContext,
+                        tr('支付信息已复制', 'Payment info copied'),
+                      );
                     },
                     child: Text(tr('复制', 'Copy')),
                   ),
                 if (paymentUri != null)
                   FilledButton.tonal(
                     onPressed: () async {
-                      await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        paymentUri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     },
                     child: Text(tr('浏览器备用', 'Browser fallback')),
                   ),
                 FilledButton(
                   onPressed: checking ? null : checkPaid,
-                  child: Text(checking ? tr('检查中...', 'Checking...') : tr('我已支付，检查状态', 'I paid, check status')),
+                  child: Text(
+                    checking
+                        ? tr('检查中...', 'Checking...')
+                        : tr('我已支付，检查状态', 'I paid, check status'),
+                  ),
                 ),
               ],
             );

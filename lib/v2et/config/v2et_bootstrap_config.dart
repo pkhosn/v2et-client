@@ -1,8 +1,9 @@
 class V2etBootstrapConfig {
   const V2etBootstrapConfig._();
 
-  // Production bootstrap config URL (OSS).
-  // Change this value before packaging if you need another source.
-  static const defaultConfigUrl =
-      'https://hko-1312628321.cos.ap-guangzhou.myqcloud.com/config.json';
+  // Local v2et-board panel base URL (used by login/API resolution).
+  static const defaultPanelUrl = 'http://127.0.0.1/m';
+
+  // Runtime UI config URL (JSON).
+  static const defaultConfigUrl = 'https://hko-1312628321.cos.ap-guangzhou.myqcloud.com/config.json';
 }

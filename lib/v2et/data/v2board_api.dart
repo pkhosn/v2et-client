@@ -264,7 +264,22 @@ class V2boardApiImpl implements V2boardApi {
 
   Uri _joinApi(Uri base, String path) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return base.replace(path: normalizedPath);
+    final basePath = _normalizeBasePath(base.path);
+    final mergedPath = basePath.isEmpty ? normalizedPath : '$basePath$normalizedPath';
+    return base.replace(path: mergedPath, query: null, fragment: null);
+  }
+
+  String _normalizeBasePath(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed == '/') return '';
+    var value = trimmed;
+    if (!value.startsWith('/')) {
+      value = '/$value';
+    }
+    if (value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    return value;
   }
 
   Future<int?> _readNodeCount(Uri subscribeUrl) async {

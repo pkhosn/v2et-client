@@ -59,7 +59,7 @@ class V2etLoginPage extends HookConsumerWidget {
     final formKey = useMemoized(GlobalKey<FormState>.new);
     final panelConfigUrl =
         savedCredentials?.baseUrl.toString() ??
-        V2etBootstrapConfig.defaultConfigUrl;
+        V2etBootstrapConfig.defaultPanelUrl;
     final emailController = useTextEditingController(
       text: savedCredentials?.email ?? '',
     );
@@ -156,6 +156,8 @@ class V2etLoginPage extends HookConsumerWidget {
           );
         context.go('/home');
       } catch (e) {
+        ref.read(v2etSessionUnlockedProvider.notifier).state = false;
+        ref.invalidate(v2etSessionProvider);
         final message = _friendlyLoginError(e, zh);
         if (context.mounted) {
           showV2etNotice(context, message, error: true);

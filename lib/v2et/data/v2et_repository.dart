@@ -43,12 +43,17 @@ class V2etRepositoryImpl implements V2etRepository {
   Future<V2boardSubscription> loginAndFetchSubscription(
     V2boardCredentials credentials,
   ) async {
-    final session = await _v2boardApi.login(credentials);
-    await _credentialsStore.saveCredentials(credentials);
-    await _credentialsStore.saveSession(session);
-    final subscription = await _v2boardApi.fetchSubscription(session);
-    await _credentialsStore.saveLastSubscription(subscription);
-    return subscription;
+    try {
+      final session = await _v2boardApi.login(credentials);
+      final subscription = await _v2boardApi.fetchSubscription(session);
+      await _credentialsStore.saveCredentials(credentials);
+      await _credentialsStore.saveSession(session);
+      await _credentialsStore.saveLastSubscription(subscription);
+      return subscription;
+    } catch (_) {
+      await _credentialsStore.clearSessionOnly();
+      rethrow;
+    }
   }
 
   @override

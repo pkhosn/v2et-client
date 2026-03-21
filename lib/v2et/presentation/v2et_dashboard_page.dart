@@ -396,7 +396,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                   backgroundColor: const Color(0xFFF5F2F8),
                                   insetPadding: EdgeInsets.symmetric(
                                     horizontal: isMobileSheet ? 12 : 120,
-                                    vertical: isMobileSheet ? 4 : 6,
+                                    vertical: isMobileSheet ? 24 : 26,
                                   ),
                                   child: Consumer(
                                     builder: (context, sheetRef, _) {
@@ -987,6 +987,10 @@ class V2etDashboardPage extends HookConsumerWidget {
     final connected =
         ref.read(connectionNotifierProvider).valueOrNull == const Connected();
     if (!connected) {
+      final directTarget = nodeTargets[item.testTag];
+      if (directTarget != null) {
+        return _runTcpProbe(directTarget);
+      }
       return 65535;
     }
 

@@ -1,5 +1,5 @@
 {
-  "api_url": "https://your-v2board-api.example.com",
+  "api_url": "http://127.0.0.1/m",
   "features": {
     "show_notice_popup": true
   },

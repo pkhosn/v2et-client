@@ -178,7 +178,7 @@ class V2etPortalApi {
   }
 
   Future<int?> checkOrderStatus({required V2boardSession session, required String tradeNo}) async {
-    final uri = session.baseUrl.replace(path: '/api/v1/user/order/check', queryParameters: {'trade_no': tradeNo});
+    final uri = _resolveApiUri(session.baseUrl, '/api/v1/user/order/check', queryParameters: {'trade_no': tradeNo});
     DioException? last;
     for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
@@ -196,7 +196,7 @@ class V2etPortalApi {
   }
 
   Future<Map<String, dynamic>> _authGet(V2boardSession session, String path) async {
-    final uri = session.baseUrl.replace(path: path, query: null, fragment: null);
+    final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
     for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
@@ -217,7 +217,7 @@ class V2etPortalApi {
     String path, {
     required Map<String, Object?> data,
   }) async {
-    final uri = session.baseUrl.replace(path: path, query: null, fragment: null);
+    final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
     for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
@@ -465,5 +465,25 @@ class V2etPortalApi {
       if (t == 'false' || t == '0' || t == 'no' || t == 'off') return false;
     }
     return null;
+  }
+
+  Uri _resolveApiUri(Uri base, String path, {Map<String, String>? queryParameters}) {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final basePath = _normalizeBasePath(base.path);
+    final mergedPath = basePath.isEmpty ? normalizedPath : '$basePath$normalizedPath';
+    return base.replace(path: mergedPath, queryParameters: queryParameters, fragment: null);
+  }
+
+  String _normalizeBasePath(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed == '/') return '';
+    var value = trimmed;
+    if (!value.startsWith('/')) {
+      value = '/$value';
+    }
+    if (value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    return value;
   }
 }

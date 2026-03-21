@@ -139,6 +139,33 @@ class V2etEndpointResolver {
   }
 
   Uri _normalizeBase(Uri uri) {
-    return uri.replace(path: '', query: null, fragment: null);
+    final rawPath = uri.path.trim();
+    if (rawPath.isEmpty || rawPath == '/') {
+      return uri.replace(path: '', query: null, fragment: null);
+    }
+
+    final lower = rawPath.toLowerCase();
+    final isPanelMPath =
+        lower == '/m' || lower == '/m/' || lower.endsWith('/m/index.html');
+    if (isPanelMPath) {
+      return uri.replace(path: '', query: null, fragment: null);
+    }
+
+    final looksLikeConfigFile =
+        lower.endsWith('.json') ||
+        lower.endsWith('/config') ||
+        lower.endsWith('/config.json') ||
+        lower.endsWith('/v2et-config.json') ||
+        lower.endsWith('/client-config.json') ||
+        lower.endsWith('/app-config.json');
+
+    if (looksLikeConfigFile) {
+      return uri.replace(path: '', query: null, fragment: null);
+    }
+
+    final trimmedPath = rawPath.endsWith('/')
+        ? rawPath.substring(0, rawPath.length - 1)
+        : rawPath;
+    return uri.replace(path: trimmedPath, query: null, fragment: null);
   }
 }

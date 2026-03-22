@@ -78,7 +78,12 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
       final runtimeConfig = runtimeConfigAsync.valueOrNull;
       final supportUri = buildV2etSupportUri(runtimeConfig);
-      final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
+      final crispSupport =
+          (runtimeConfig?.supportProvider?.toLowerCase() == 'crisp') ||
+          ((runtimeConfig?.crispWebsiteId ?? '').trim().isNotEmpty);
+      final showSupportFab =
+          !crispSupport && (supportUri != null || runtimeConfigAsync.isLoading);
+      final crispAutoOpened = useState(false);
 
       useEffect(() {
         final port = runtimeConfig?.defaultPort;
@@ -91,6 +96,26 @@ class MyAdaptiveLayout extends HookConsumerWidget {
         }
         return null;
       }, [runtimeConfig?.defaultPort]);
+
+      useEffect(() {
+        if (!crispSupport || supportUri == null || crispAutoOpened.value) {
+          return null;
+        }
+        crispAutoOpened.value = true;
+        unawaited(() async {
+          var opened = await launchUrl(
+            supportUri,
+            mode: LaunchMode.inAppWebView,
+          );
+          if (!opened) {
+            await launchUrl(
+              supportUri,
+              mode: LaunchMode.externalApplication,
+            );
+          }
+        }());
+        return null;
+      }, [crispSupport, supportUri?.toString()]);
 
       return Material(
         color: const Color(0xFFF5F2F8),

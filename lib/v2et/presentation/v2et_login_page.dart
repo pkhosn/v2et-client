@@ -112,7 +112,11 @@ class V2etLoginPage extends HookConsumerWidget {
     final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
     final runtimeConfig = runtimeConfigAsync.valueOrNull;
     final supportUri = buildV2etSupportUri(runtimeConfig);
-    final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
+    final crispSupport =
+        (runtimeConfig?.supportProvider?.toLowerCase() == 'crisp') ||
+        ((runtimeConfig?.crispWebsiteId ?? '').trim().isNotEmpty);
+    final showSupportFab =
+        !crispSupport && (supportUri != null || runtimeConfigAsync.isLoading);
 
     final modeTitle = switch (authMode.value) {
       _AuthMode.login => tr('登录', 'Login'),

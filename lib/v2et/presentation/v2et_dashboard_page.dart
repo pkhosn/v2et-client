@@ -1034,7 +1034,20 @@ class _ConnectionHero extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Positioned.fill(
-            child: IgnorePointer(child: CustomPaint(painter: _WorldMapSketchPainter())),
+            child: IgnorePointer(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 8),
+                child: Opacity(
+                  opacity: 0.38,
+                  child: Image.asset(
+                    'assets/images/world_map.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              ),
+            ),
           ),
           button,
         ],

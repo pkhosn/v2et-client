@@ -131,6 +131,22 @@ class V2etPortalApi {
     return type == -1;
   }
 
+  Future<bool> checkCoupon({required V2boardSession session, required int planId, required String couponCode}) async {
+    final code = couponCode.trim();
+    if (code.isEmpty) return false;
+    final resp = await _authPost(session, '/api/v1/user/coupon/check', data: {'code': code, 'plan_id': planId});
+    final payload = _readMapNullable(resp['data']) ?? _readMap(resp);
+    final type = _readInt(payload['type']) ?? _readInt(resp['type']);
+    if (type != null) {
+      return type != 0;
+    }
+    final amount = _readNum(payload['amount']) ?? _readNum(payload['value']) ?? _readNum(payload['discount']);
+    if (amount != null) {
+      return amount >= 0;
+    }
+    return true;
+  }
+
   Future<List<V2etPaymentMethod>> fetchPaymentMethods(V2boardSession session) async {
     final json = await _authGet(session, '/api/v1/user/order/getPaymentMethod');
     final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
@@ -389,8 +405,12 @@ class V2etPortalApi {
           final map = item.map((k, v) => MapEntry(k.toString(), v));
           final text = _readString(map['feature']) ?? _readString(map['title']) ?? _readString(map['name']);
           if (text == null || text.isEmpty) continue;
-          final supported = _readBool(map['support']) ?? _readBool(map['enabled']) ?? true;
-          list.add(supported ? text : '- $text');
+          final supportValue = _readBool(map['support']) ?? _readBool(map['enabled']);
+          if (supportValue == null) {
+            list.add(text);
+          } else {
+            list.add('${supportValue ? '✓' : '✗'} $text');
+          }
         } else if (item is String && item.trim().isNotEmpty) {
           list.add(item.trim());
         }
@@ -431,8 +451,11 @@ class V2etPortalApi {
       for (final key in const ['feature', 'title', 'name']) {
         final text = _readString(map[key]);
         if (text != null && text.isNotEmpty) {
-          final supported = _readBool(map['support']) ?? _readBool(map['enabled']) ?? true;
-          return [supported ? text : '- $text'];
+          final supportValue = _readBool(map['support']) ?? _readBool(map['enabled']);
+          if (supportValue == null) {
+            return [text];
+          }
+          return ['${supportValue ? '✓' : '✗'} $text'];
         }
       }
     }

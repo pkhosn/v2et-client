@@ -18,9 +18,7 @@ class V2etStorePage extends ConsumerStatefulWidget {
 class _V2etStorePageState extends ConsumerState<V2etStorePage> {
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(
-      context,
-    ).languageCode.toLowerCase().startsWith('zh');
+    final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
     final compact = MediaQuery.sizeOf(context).width < 720;
     String tr(String a, String b) => zh ? a : b;
 
@@ -31,45 +29,25 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
       backgroundColor: const Color(0xFFF5F2F8),
       body: SafeArea(
         child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            compact ? 12 : 20,
-            compact ? 8 : 14,
-            compact ? 12 : 20,
-            16,
-          ),
+          padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, 16),
           children: [
             Row(
-              children: [
-                Text(
-                  tr('商店', 'Store'),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+              children: [Text(tr('商店', 'Store'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700))],
             ),
             const SizedBox(height: 14),
             if (visibleOffers.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 28),
                 child: Center(
-                  child: Text(
-                    tr('暂无套餐数据', 'No plans available yet'),
-                    style: const TextStyle(color: Color(0xFF514C59)),
-                  ),
+                  child: Text(tr('暂无套餐数据', 'No plans available yet'), style: const TextStyle(color: Color(0xFF514C59))),
                 ),
               )
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = compact
-                      ? (constraints.maxWidth >= 760 ? 2 : 1)
-                      : 3;
+                  final columns = compact ? (constraints.maxWidth >= 760 ? 2 : 1) : 3;
                   final spacing = 12.0;
-                  final width =
-                      (constraints.maxWidth - spacing * (columns - 1)) /
-                      columns;
+                  final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
 
                   return Wrap(
                     spacing: spacing,
@@ -119,10 +97,7 @@ class _OfferCard extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             color: const Color(0xFFECE8F3),
-            child: Text(
-              offer.name,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
+            child: Text(offer.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           ),
           Container(
             width: double.infinity,
@@ -136,35 +111,19 @@ class _OfferCard extends ConsumerWidget {
                     children: [
                       const TextSpan(
                         text: '¥ ',
-                        style: TextStyle(
-                          color: Color(0xFF2F2A39),
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: TextStyle(color: Color(0xFF2F2A39), fontSize: 20, fontWeight: FontWeight.w700),
                       ),
                       TextSpan(
-                        text: mainPrice == null
-                            ? '0.00'
-                            : mainPrice.$2.toStringAsFixed(2),
-                        style: const TextStyle(
-                          color: Color(0xFF1D2636),
-                          fontSize: 36,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        text: mainPrice == null ? '0.00' : mainPrice.$2.toStringAsFixed(2),
+                        style: const TextStyle(color: Color(0xFF1D2636), fontSize: 36, fontWeight: FontWeight.w800),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  mainPrice == null
-                      ? tr('未定义周期', 'Undefined period')
-                      : _periodLabel(mainPrice.$1),
-                  style: const TextStyle(
-                    color: Color(0xFF4E4957),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  mainPrice == null ? tr('未定义周期', 'Undefined period') : _periodLabel(mainPrice.$1),
+                  style: const TextStyle(color: Color(0xFF4E4957), fontSize: 20, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -176,14 +135,7 @@ class _OfferCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  description,
-                  style: const TextStyle(
-                    color: Color(0xFF2D2737),
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
-                ),
+                Text(description, style: const TextStyle(color: Color(0xFF2D2737), fontSize: 15, height: 1.5)),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -192,50 +144,35 @@ class _OfferCard extends ConsumerWidget {
                       backgroundColor: const Color(0xFFBDECF2),
                       foregroundColor: const Color(0xFF195A65),
                       minimumSize: const Size.fromHeight(40),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      textStyle: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 22,
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
                     ),
                     onPressed: () async {
-                      V2boardSession? session = ref
-                          .read(v2etSessionProvider)
-                          .valueOrNull;
-                      session ??= await ref
-                          .read(v2etRepositoryProvider)
-                          .restoreSession();
-                      if (session == null ||
-                          !session.hasToken ||
-                          offer.id == null) {
+                      V2boardSession? session = ref.read(v2etSessionProvider).valueOrNull;
+                      session ??= await ref.read(v2etRepositoryProvider).restoreSession();
+                      if (session == null || !session.hasToken || offer.id == null) {
                         if (!context.mounted) return;
-                        showV2etNotice(
-                          context,
-                          tr('请先登录后购买', 'Please login before purchase'),
-                          error: true,
-                        );
+                        showV2etNotice(context, tr('请先登录后购买', 'Please login before purchase'), error: true);
                         return;
                       }
 
-                      final period = await _pickPeriod(context, allPrices);
-                      if (period == null || !context.mounted) return;
-
-                      final method = await _pickPaymentMethod(
-                        context,
-                        ref,
-                        session,
+                      final input = await _openPurchaseDialog(
+                        context: context,
+                        ref: ref,
+                        session: session,
+                        offer: offer,
+                        prices: allPrices,
                       );
-                      if (method == null || !context.mounted) return;
+                      if (input == null || !context.mounted) return;
 
                       await _startCheckout(
                         context: context,
                         ref: ref,
                         session: session,
                         planId: offer.id!,
-                        period: period,
-                        paymentMethod: method,
+                        period: input.period,
+                        paymentMethod: input.paymentMethod,
+                        couponCode: input.couponCode,
                       );
                     },
                     child: Text(tr('立即订阅', 'Subscribe now')),
@@ -254,20 +191,14 @@ class _OfferCard extends ConsumerWidget {
                     .skip(1)
                     .map(
                       (e) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE9E4EF),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           '${_periodLabel(e.$1)} ¥${e.$2.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF3F3A49),
-                          ),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF3F3A49)),
                         ),
                       ),
                     )
@@ -280,20 +211,9 @@ class _OfferCard extends ConsumerWidget {
   }
 
   List<(String, double)> _priceEntries(V2etStoreOffer c) {
-    const order = [
-      'month',
-      'quarter',
-      'half_year',
-      'year',
-      'two_year',
-      'three_year',
-      'onetime',
-      'reset',
-    ];
+    const order = ['month', 'quarter', 'half_year', 'year', 'two_year', 'three_year', 'onetime', 'reset'];
     final entries = c.prices.entries.toList();
-    entries.sort(
-      (a, b) => order.indexOf(a.key).compareTo(order.indexOf(b.key)),
-    );
+    entries.sort((a, b) => order.indexOf(a.key).compareTo(order.indexOf(b.key)));
     return entries.map((e) => (e.key, e.value)).toList();
   }
 
@@ -314,10 +234,18 @@ class _OfferCard extends ConsumerWidget {
   String _descriptionText(V2etStoreOffer offer) {
     final lines = <String>[];
     for (final item in offer.features) {
-      final text = item.replaceFirst(RegExp(r'^(-|x\s+|✗\s*)'), '').trim();
-      if (text.isNotEmpty) {
-        lines.add(text);
+      final raw = item.trim();
+      if (raw.isEmpty) continue;
+
+      if (raw.startsWith('✓ ') || raw.startsWith('✗ ')) {
+        lines.add(raw);
+        continue;
       }
+      if (raw.startsWith('- ')) {
+        lines.add('✗ ${raw.substring(2).trim()}');
+        continue;
+      }
+      lines.add('✓ $raw');
     }
     if (offer.traffic != null && offer.traffic! > 0) {
       lines.add(tr('流量: ', 'Traffic: ') + _humanBytes(offer.traffic!));
@@ -326,15 +254,10 @@ class _OfferCard extends ConsumerWidget {
       lines.add(tr('速率: ', 'Speed: ') + offer.speed!.trim());
     }
     if (offer.deviceLimit != null) {
-      lines.add(
-        tr('设备限制: ', 'Device limit: ') + '${offer.deviceLimit}${tr('台', '')}',
-      );
+      lines.add(tr('设备限制: ', 'Device limit: ') + '${offer.deviceLimit}${tr('台', '')}');
     }
     if (lines.isEmpty) {
-      return tr(
-        '高速稳定网络服务，适配多终端场景。',
-        'Fast and stable network service for multi-device usage.',
-      );
+      return tr('高速稳定网络服务，适配多终端场景。', 'Fast and stable network service for multi-device usage.');
     }
     return lines.join('\n');
   }
@@ -350,86 +273,182 @@ class _OfferCard extends ConsumerWidget {
     return '${size.toStringAsFixed(size >= 100 ? 0 : 2)} ${units[unit]}';
   }
 
-  Future<String?> _pickPeriod(
-    BuildContext context,
-    List<(String, double)> prices,
-  ) async {
-    if (prices.isEmpty) return null;
-    if (prices.length == 1) return prices.first.$1;
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(tr('选择套餐周期', 'Select billing period')),
-          content: SizedBox(
-            width: 360,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                for (final entry in prices)
-                  ListTile(
-                    title: Text(_periodLabel(entry.$1)),
-                    subtitle: Text('¥ ${entry.$2.toStringAsFixed(2)}'),
-                    onTap: () => Navigator.of(ctx).pop(entry.$1),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(tr('取消', 'Cancel')),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<V2etPaymentMethod?> _pickPaymentMethod(
-    BuildContext context,
-    WidgetRef ref,
-    V2boardSession session,
-  ) async {
-    final methods = await ref
-        .read(v2etPortalApiProvider)
-        .fetchPaymentMethods(session);
+  Future<_PurchaseInput?> _openPurchaseDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required V2boardSession session,
+    required V2etStoreOffer offer,
+    required List<(String, double)> prices,
+  }) async {
+    if (prices.isEmpty || offer.id == null) return null;
+    final methods = await ref.read(v2etPortalApiProvider).fetchPaymentMethods(session);
     if (!context.mounted) return null;
     if (methods.isEmpty) {
-      showV2etNotice(
-        context,
-        tr('暂无可用支付方式', 'No payment method available'),
-        error: true,
-      );
+      showV2etNotice(context, tr('暂无可用支付方式', 'No payment method available'), error: true);
       return null;
     }
-    return showDialog<V2etPaymentMethod>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(tr('选择支付方式', 'Select payment method')),
-          content: SizedBox(
-            width: 360,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                for (final method in methods)
-                  ListTile(
-                    title: Text(method.name),
-                    onTap: () => Navigator.of(ctx).pop(method),
+
+    final couponController = TextEditingController();
+    try {
+      return await showDialog<_PurchaseInput>(
+        context: context,
+        builder: (dialogContext) {
+          String selectedPeriod = prices.first.$1;
+          V2etPaymentMethod selectedMethod = methods.first;
+          bool checkingCoupon = false;
+          bool? couponValid;
+
+          return StatefulBuilder(
+            builder: (ctx, setState) {
+              final selectedPrice = prices.firstWhere((e) => e.$1 == selectedPeriod, orElse: () => prices.first);
+
+              Future<void> verifyCoupon() async {
+                final code = couponController.text.trim();
+                if (code.isEmpty) {
+                  showV2etNotice(ctx, tr('请输入优惠码', 'Enter coupon code'), error: true);
+                  return;
+                }
+                setState(() => checkingCoupon = true);
+                try {
+                  final ok = await ref
+                      .read(v2etPortalApiProvider)
+                      .checkCoupon(session: session, planId: offer.id!, couponCode: code);
+                  setState(() => couponValid = ok);
+                  if (ctx.mounted) {
+                    showV2etNotice(
+                      ctx,
+                      ok ? tr('优惠码可用', 'Coupon is valid') : tr('优惠码不可用', 'Coupon is invalid'),
+                      error: !ok,
+                    );
+                  }
+                } catch (e) {
+                  setState(() => couponValid = false);
+                  if (ctx.mounted) {
+                    showV2etNotice(ctx, tr('优惠码验证失败: ', 'Coupon check failed: ') + e.toString(), error: true);
+                  }
+                } finally {
+                  if (ctx.mounted) setState(() => checkingCoupon = false);
+                }
+              }
+
+              return AlertDialog(
+                title: Text(tr('确认购买', 'Confirm purchase')),
+                content: SizedBox(
+                  width: 760,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(offer.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 10),
+                        Text(
+                          tr('套餐下可购买选项', 'Available billing options'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final entry in prices)
+                          RadioListTile<String>(
+                            dense: true,
+                            value: entry.$1,
+                            groupValue: selectedPeriod,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(_periodLabel(entry.$1)),
+                            subtitle: Text('¥ ${entry.$2.toStringAsFixed(2)}'),
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setState(() => selectedPeriod = v);
+                            },
+                          ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: couponController,
+                          decoration: InputDecoration(
+                            labelText: tr('输入优惠码', 'Coupon code'),
+                            suffixIcon: TextButton(
+                              onPressed: checkingCoupon ? null : verifyCoupon,
+                              child: Text(checkingCoupon ? tr('验证中', 'Checking') : tr('验证', 'Verify')),
+                            ),
+                          ),
+                        ),
+                        if (couponValid != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              couponValid! ? tr('优惠码已通过验证', 'Coupon verified') : tr('优惠码无效', 'Coupon invalid'),
+                              style: TextStyle(
+                                color: couponValid! ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<int>(
+                          value: selectedMethod.id,
+                          decoration: InputDecoration(labelText: tr('选择支付方式', 'Payment method')),
+                          items: [for (final m in methods) DropdownMenuItem(value: m.id, child: Text(m.name))],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            final found = methods.where((m) => m.id == value);
+                            if (found.isNotEmpty) {
+                              setState(() => selectedMethod = found.first);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2F3441),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tr('订单总额', 'Order total'),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${offer.name} x ${_periodLabel(selectedPrice.$1)}',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '¥ ${selectedPrice.$2.toStringAsFixed(2)} CNY',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 30),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(tr('取消', 'Cancel')),
-            ),
-          ],
-        );
-      },
-    );
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('取消', 'Cancel'))),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop(
+                        _PurchaseInput(
+                          period: selectedPeriod,
+                          paymentMethod: selectedMethod,
+                          couponCode: couponController.text.trim(),
+                        ),
+                      );
+                    },
+                    child: Text(tr('确定购买', 'Place order')),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      couponController.dispose();
+    }
   }
 
   Future<void> _startCheckout({
@@ -439,6 +458,7 @@ class _OfferCard extends ConsumerWidget {
     required int planId,
     required String period,
     required V2etPaymentMethod paymentMethod,
+    String? couponCode,
   }) async {
     try {
       final api = ref.read(v2etPortalApiProvider);
@@ -446,12 +466,9 @@ class _OfferCard extends ConsumerWidget {
         session: session,
         planId: planId,
         periodField: _periodField(period),
+        couponCode: couponCode,
       );
-      final checkout = await api.checkoutOrder(
-        session: session,
-        tradeNo: tradeNo,
-        paymentMethodId: paymentMethod.id,
-      );
+      final checkout = await api.checkoutOrder(session: session, tradeNo: tradeNo, paymentMethodId: paymentMethod.id);
       if (!context.mounted) return;
 
       if (checkout.type == -1) {
@@ -460,20 +477,18 @@ class _OfferCard extends ConsumerWidget {
         return;
       }
 
-      await _showPaymentDialog(
-        context: context,
-        ref: ref,
-        session: session,
-        tradeNo: tradeNo,
-        checkout: checkout,
-      );
+      final paymentUri = _resolvePaymentUri(checkout.data);
+      if (paymentUri != null) {
+        var opened = await launchUrl(paymentUri, mode: LaunchMode.inAppWebView);
+        if (!opened) {
+          await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+        }
+      }
+
+      await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);
     } catch (e) {
       if (!context.mounted) return;
-      showV2etNotice(
-        context,
-        tr('下单失败: ', 'Checkout failed: ') + e.toString(),
-        error: true,
-      );
+      showV2etNotice(context, tr('下单失败: ', 'Checkout failed: ') + e.toString(), error: true);
     }
   }
 
@@ -492,9 +507,7 @@ class _OfferCard extends ConsumerWidget {
     }
 
     final qrData = Uri.encodeComponent(raw);
-    return Uri.parse(
-      'https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=$qrData',
-    );
+    return Uri.parse('https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=$qrData');
   }
 
   Future<void> _showPaymentDialog({
@@ -528,24 +541,14 @@ class _OfferCard extends ConsumerWidget {
                     Navigator.of(dialogContext).pop();
                   }
                   if (context.mounted) {
-                    showV2etNotice(
-                      context,
-                      tr('支付成功，套餐已生效', 'Payment successful, plan activated'),
-                    );
+                    showV2etNotice(context, tr('支付成功，套餐已生效', 'Payment successful, plan activated'));
                   }
                 } else if (innerContext.mounted) {
-                  showV2etNotice(
-                    innerContext,
-                    tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'),
-                  );
+                  showV2etNotice(innerContext, tr('订单尚未支付完成，请稍后再试', 'Order still unpaid, please retry'));
                 }
               } catch (e) {
                 if (innerContext.mounted) {
-                  showV2etNotice(
-                    innerContext,
-                    tr('查询订单失败: ', 'Order check failed: ') + e.toString(),
-                    error: true,
-                  );
+                  showV2etNotice(innerContext, tr('查询订单失败: ', 'Order check failed: ') + e.toString(), error: true);
                 }
               } finally {
                 if (dialogContext.mounted) {
@@ -572,9 +575,7 @@ class _OfferCard extends ConsumerWidget {
                         ),
                       )
                     else if (paymentUri != null) ...[
-                      Text(
-                        tr('请扫码或打开链接完成付款', 'Scan QR code or open link to pay'),
-                      ),
+                      Text(tr('请扫码或打开链接完成付款', 'Scan QR code or open link to pay')),
                       const SizedBox(height: 10),
                       Center(
                         child: Image.network(
@@ -585,49 +586,31 @@ class _OfferCard extends ConsumerWidget {
                         ),
                       ),
                     ] else
-                      Text(
-                        tr(
-                          '支付数据无效，请网页支付',
-                          'Invalid payment payload, please pay in web browser',
-                        ),
-                      ),
+                      Text(tr('支付数据无效，请网页支付', 'Invalid payment payload, please pay in web browser')),
                   ],
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: Text(tr('稍后支付', 'Later')),
-                ),
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('稍后支付', 'Later'))),
                 if (raw.isNotEmpty)
                   TextButton(
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: raw));
                       if (!innerContext.mounted) return;
-                      showV2etNotice(
-                        innerContext,
-                        tr('支付信息已复制', 'Payment info copied'),
-                      );
+                      showV2etNotice(innerContext, tr('支付信息已复制', 'Payment info copied'));
                     },
                     child: Text(tr('复制', 'Copy')),
                   ),
                 if (paymentUri != null)
                   FilledButton.tonal(
                     onPressed: () async {
-                      await launchUrl(
-                        paymentUri,
-                        mode: LaunchMode.externalApplication,
-                      );
+                      await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
                     },
                     child: Text(tr('浏览器备用', 'Browser fallback')),
                   ),
                 FilledButton(
                   onPressed: checking ? null : checkPaid,
-                  child: Text(
-                    checking
-                        ? tr('检查中...', 'Checking...')
-                        : tr('我已支付，检查状态', 'I paid, check status'),
-                  ),
+                  child: Text(checking ? tr('检查中...', 'Checking...') : tr('我已支付，检查状态', 'I paid, check status')),
                 ),
               ],
             );
@@ -650,4 +633,12 @@ class _OfferCard extends ConsumerWidget {
       _ => 'month_price',
     };
   }
+}
+
+class _PurchaseInput {
+  const _PurchaseInput({required this.period, required this.paymentMethod, required this.couponCode});
+
+  final String period;
+  final V2etPaymentMethod paymentMethod;
+  final String couponCode;
 }

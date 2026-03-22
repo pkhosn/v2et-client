@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -396,7 +397,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                   backgroundColor: const Color(0xFFF5F2F8),
                                   insetPadding: EdgeInsets.symmetric(
                                     horizontal: isMobileSheet ? 12 : 120,
-                                    vertical: isMobileSheet ? 44 : 46,
+                                    vertical: isMobileSheet ? 64 : 66,
                                   ),
                                   child: Consumer(
                                     builder: (context, sheetRef, _) {
@@ -455,7 +456,11 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                               ),
                                                         ),
                                                         const Spacer(),
-                                                        OutlinedButton(
+                                                        IconButton(
+                                                          tooltip: tr(
+                                                            '刷新线路',
+                                                            'Refresh routes',
+                                                          ),
                                                           onPressed: () {
                                                             modalLink.clear();
                                                             modalLinkLoading
@@ -483,10 +488,10 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                   ),
                                                             );
                                                           },
-                                                          child: const Icon(
+                                                          icon: const Icon(
                                                             Icons
                                                                 .refresh_rounded,
-                                                            size: 16,
+                                                            size: 20,
                                                           ),
                                                         ),
                                                       ],
@@ -786,6 +791,10 @@ class V2etDashboardPage extends HookConsumerWidget {
 
         String? host = item['server']?.toString().trim();
         int? port = _parsePort(item['server_port']) ?? _parsePort(item['port']);
+        final peer = item['peer']?.toString().trim();
+        if ((host == null || host.isEmpty) && peer != null && peer.isNotEmpty) {
+          host = peer;
+        }
         host ??= item['address']?.toString().trim();
         if ((host == null || host.isEmpty) && item['server'] != null) {
           final serverText = item['server'].toString().trim();
@@ -793,6 +802,13 @@ class V2etDashboardPage extends HookConsumerWidget {
           if (idx > 0 && idx < serverText.length - 1) {
             host = serverText.substring(0, idx);
             port ??= _parsePort(serverText.substring(idx + 1));
+          }
+        }
+        if ((host == null || host.isEmpty) && peer != null && peer.isNotEmpty) {
+          final idx = peer.lastIndexOf(':');
+          if (idx > 0 && idx < peer.length - 1) {
+            host = peer.substring(0, idx);
+            port ??= _parsePort(peer.substring(idx + 1));
           }
         }
         if (host != null &&
@@ -829,32 +845,18 @@ class V2etDashboardPage extends HookConsumerWidget {
       return 65535;
     }
 
-    int? bestMs;
+    final timer = Stopwatch()..start();
     try {
-      for (var i = 0; i < 2; i++) {
-        final timer = Stopwatch()..start();
-        try {
-          final res = await repo
-              .getCurrentIpInfo(CancelToken())
-              .run()
-              .timeout(const Duration(seconds: 5));
-          final ms = res.match((_) => 65535, (_) => timer.elapsedMilliseconds);
-          if (ms > 0 && ms < 65535) {
-            if (bestMs == null || ms < bestMs) {
-              bestMs = ms;
-            }
-          }
-        } catch (_) {
-          // ignore single probe failure, retry once
-        } finally {
-          timer.stop();
-        }
-        if (i == 0) {
-          await Future<void>.delayed(const Duration(milliseconds: 120));
-        }
-      }
-      return bestMs ?? 65535;
+      final res = await repo
+          .getCurrentIpInfo(CancelToken())
+          .run()
+          .timeout(const Duration(seconds: 4));
+      final ms = res.match((_) => 65535, (_) => timer.elapsedMilliseconds);
+      return ms > 0 ? ms : 65535;
+    } catch (_) {
+      return 65535;
     } finally {
+      timer.stop();
       if (restoreTag != null &&
           restoreTag.isNotEmpty &&
           restoreTag != outboundTag) {
@@ -894,7 +896,6 @@ class V2etDashboardPage extends HookConsumerWidget {
     final autoLabel = zh ? '自动选择' : 'Auto Select';
     final failoverLabel = zh ? '故障转移' : 'Failover';
     final currentGroupTag = _readGroupTag(proxyGroup) ?? 'select';
-    final currentSelectedTag = _readSelectedTag(proxyGroup) ?? currentGroupTag;
     final autoSelectTag = resolveTag([
       autoLabel,
       'auto select',
@@ -917,7 +918,7 @@ class V2etDashboardPage extends HookConsumerWidget {
         tag: autoLabel,
         flag: '⚡',
         selectTag: autoSelectTag ?? currentGroupTag,
-        testTag: autoSelectTag ?? currentSelectedTag,
+        testTag: autoSelectTag ?? currentGroupTag,
         linkMs: linkOverrides['__auto__'],
         isSpecial: true,
       ),
@@ -928,7 +929,7 @@ class V2etDashboardPage extends HookConsumerWidget {
         tag: failoverLabel,
         flag: '🛡️',
         selectTag: failoverTag ?? currentGroupTag,
-        testTag: failoverTag ?? currentSelectedTag,
+        testTag: failoverTag ?? currentGroupTag,
         linkMs: linkOverrides['__failover__'],
         isSpecial: true,
       ),
@@ -970,14 +971,17 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  Future<int?> _runTcpProbe(_NodeTarget target) async {
+  Future<int?> _runTcpProbe(
+    _NodeTarget target, {
+    Duration timeout = const Duration(milliseconds: 2200),
+  }) async {
     final watch = Stopwatch()..start();
     Socket? socket;
     try {
       socket = await Socket.connect(
         target.host,
         target.port,
-        timeout: const Duration(seconds: 4),
+        timeout: timeout,
       );
       return watch.elapsedMilliseconds;
     } catch (_) {
@@ -994,27 +998,77 @@ class V2etDashboardPage extends HookConsumerWidget {
     required Map<String, _NodeTarget> nodeTargets,
     required dynamic currentGroup,
   }) async {
+    final connected =
+        ref.read(connectionNotifierProvider).valueOrNull == const Connected();
     final groupTag = _readGroupTag(currentGroup) ?? 'select';
     final restoreTag = _readSelectedTag(currentGroup);
-    final linkProbe = await _runLinkProbe(
-      ref,
-      groupTag: groupTag,
-      outboundTag: item.testTag,
-      restoreTag: restoreTag,
-    );
-    if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
-      return linkProbe;
+
+    if (connected) {
+      final linkProbe = await _runLinkProbe(
+        ref,
+        groupTag: groupTag,
+        outboundTag: item.selectTag,
+        restoreTag: restoreTag,
+      );
+      if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
+        return linkProbe;
+      }
     }
 
-    final directTarget =
-        nodeTargets[item.testTag] ??
-        (item.isSpecial && restoreTag != null
-            ? nodeTargets[restoreTag]
-            : null);
+    if (item.isSpecial) {
+      return _runSpecialModeProbe(
+        item,
+        nodeTargets,
+        currentSelectedTag: restoreTag,
+      );
+    }
+
+    final directTarget = nodeTargets[item.testTag];
     if (directTarget != null) {
       return _runTcpProbe(directTarget);
     }
     return 65535;
+  }
+
+  Future<int?> _runSpecialModeProbe(
+    _NodeEntry item,
+    Map<String, _NodeTarget> nodeTargets, {
+    String? currentSelectedTag,
+  }) async {
+    if (nodeTargets.isEmpty) {
+      return 65535;
+    }
+
+    if (item.id == '__failover__' &&
+        currentSelectedTag != null &&
+        currentSelectedTag.isNotEmpty) {
+      final currentTarget = nodeTargets[currentSelectedTag];
+      if (currentTarget != null) {
+        final currentMs = await _runTcpProbe(currentTarget);
+        if (currentMs != null && currentMs > 0 && currentMs < 65535) {
+          return currentMs;
+        }
+      }
+    }
+
+    final candidates = nodeTargets.entries.toList();
+    final cap = min(8, candidates.length);
+    final checks = candidates.take(cap).map(
+      (e) => _runTcpProbe(
+        e.value,
+        timeout: const Duration(milliseconds: 1800),
+      ),
+    );
+    final results = await Future.wait(checks);
+    final good = results
+        .whereType<int>()
+        .where((ms) => ms > 0 && ms < 65535)
+        .toList();
+    if (good.isEmpty) {
+      return 65535;
+    }
+    good.sort();
+    return good.first;
   }
 
   Future<void> _openRenewDialog(BuildContext context) async {
@@ -1370,74 +1424,205 @@ class _ConnectionHero extends StatelessWidget {
 class _WorldMapSketchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFCBC6D6).withValues(alpha: 0.42)
-      ..style = PaintingStyle.fill;
+    final outline = Paint()
+      ..color = const Color(0xFFB8AEC9).withValues(alpha: 0.52)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 2.2;
 
-    final path = Path();
+    final accent = Paint()
+      ..color = const Color(0xFFE1DCEA).withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.0;
 
-    // North America
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.03,
-          size.height * 0.30,
-          size.width * 0.24,
-          size.height * 0.24,
-        ),
-        const Radius.circular(24),
-      ),
-    );
-    // South America
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.20,
-          size.height * 0.56,
-          size.width * 0.09,
-          size.height * 0.26,
-        ),
-        const Radius.circular(20),
-      ),
-    );
-    // Europe + Africa
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.43,
-          size.height * 0.30,
-          size.width * 0.14,
-          size.height * 0.44,
-        ),
-        const Radius.circular(26),
-      ),
-    );
-    // Asia
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.58,
-          size.height * 0.26,
-          size.width * 0.31,
-          size.height * 0.30,
-        ),
-        const Radius.circular(30),
-      ),
-    );
-    // Australia
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.82,
-          size.height * 0.62,
-          size.width * 0.13,
-          size.height * 0.14,
-        ),
-        const Radius.circular(20),
-      ),
-    );
+    Path p(double x, double y) =>
+        Path()..moveTo(size.width * x, size.height * y);
 
-    canvas.drawPath(path, paint);
+    final northAmerica =
+        p(0.06, 0.39)
+          ..quadraticBezierTo(
+            size.width * 0.11,
+            size.height * 0.26,
+            size.width * 0.20,
+            size.height * 0.30,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.26,
+            size.height * 0.33,
+            size.width * 0.24,
+            size.height * 0.42,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.18,
+            size.height * 0.47,
+            size.width * 0.11,
+            size.height * 0.44,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.08,
+            size.height * 0.42,
+            size.width * 0.06,
+            size.height * 0.39,
+          );
+
+    final southAmerica =
+        p(0.23, 0.50)
+          ..quadraticBezierTo(
+            size.width * 0.27,
+            size.height * 0.58,
+            size.width * 0.24,
+            size.height * 0.68,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.21,
+            size.height * 0.76,
+            size.width * 0.18,
+            size.height * 0.82,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.20,
+            size.height * 0.72,
+            size.width * 0.19,
+            size.height * 0.61,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.18,
+            size.height * 0.55,
+            size.width * 0.23,
+            size.height * 0.50,
+          );
+
+    final europeAfrica =
+        p(0.44, 0.33)
+          ..quadraticBezierTo(
+            size.width * 0.49,
+            size.height * 0.29,
+            size.width * 0.53,
+            size.height * 0.34,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.54,
+            size.height * 0.40,
+            size.width * 0.49,
+            size.height * 0.44,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.48,
+            size.height * 0.56,
+            size.width * 0.51,
+            size.height * 0.66,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.47,
+            size.height * 0.73,
+            size.width * 0.43,
+            size.height * 0.66,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.41,
+            size.height * 0.54,
+            size.width * 0.42,
+            size.height * 0.45,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.40,
+            size.height * 0.37,
+            size.width * 0.44,
+            size.height * 0.33,
+          );
+
+    final asia =
+        p(0.56, 0.36)
+          ..quadraticBezierTo(
+            size.width * 0.64,
+            size.height * 0.24,
+            size.width * 0.77,
+            size.height * 0.30,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.85,
+            size.height * 0.34,
+            size.width * 0.86,
+            size.height * 0.42,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.80,
+            size.height * 0.47,
+            size.width * 0.73,
+            size.height * 0.46,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.66,
+            size.height * 0.50,
+            size.width * 0.61,
+            size.height * 0.46,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.57,
+            size.height * 0.42,
+            size.width * 0.56,
+            size.height * 0.36,
+          );
+
+    final australia =
+        p(0.79, 0.66)
+          ..quadraticBezierTo(
+            size.width * 0.84,
+            size.height * 0.62,
+            size.width * 0.89,
+            size.height * 0.66,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.91,
+            size.height * 0.71,
+            size.width * 0.87,
+            size.height * 0.75,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.82,
+            size.height * 0.76,
+            size.width * 0.79,
+            size.height * 0.70,
+          )
+          ..quadraticBezierTo(
+            size.width * 0.78,
+            size.height * 0.68,
+            size.width * 0.79,
+            size.height * 0.66,
+          );
+
+    canvas.drawPath(northAmerica, outline);
+    canvas.drawPath(southAmerica, outline);
+    canvas.drawPath(europeAfrica, outline);
+    canvas.drawPath(asia, outline);
+    canvas.drawPath(australia, outline);
+
+    canvas.drawArc(
+      Rect.fromLTWH(
+        size.width * 0.03,
+        size.height * 0.19,
+        size.width * 0.95,
+        size.height * 0.62,
+      ),
+      0.3,
+      pi - 0.6,
+      false,
+      accent,
+    );
+    canvas.drawArc(
+      Rect.fromLTWH(
+        size.width * 0.10,
+        size.height * 0.26,
+        size.width * 0.82,
+        size.height * 0.50,
+      ),
+      0.28,
+      pi - 0.56,
+      false,
+      accent,
+    );
   }
 
   @override

@@ -483,6 +483,13 @@ class _OfferCard extends ConsumerWidget {
         if (!opened) {
           await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
         }
+        if (context.mounted) {
+          showV2etNotice(
+            context,
+            tr('已打开支付页面，支付完成后请返回客户端查看订单状态', 'Payment page opened. Return to app after payment to check order status.'),
+          );
+        }
+        return;
       }
 
       await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);

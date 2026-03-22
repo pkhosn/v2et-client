@@ -145,11 +145,6 @@ class V2etEndpointResolver {
     }
 
     final lower = rawPath.toLowerCase();
-    final isPanelMPath =
-        lower == '/m' || lower == '/m/' || lower.endsWith('/m/index.html');
-    if (isPanelMPath) {
-      return uri.replace(path: '', query: null, fragment: null);
-    }
 
     final looksLikeConfigFile =
         lower.endsWith('.json') ||

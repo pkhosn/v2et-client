@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -101,10 +103,15 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       'crisp.website_id',
       'crisp.id',
       'crispid',
+      'crisp_id',
+      'crisp.websiteId',
+      'support.crisp_id',
       'features.crisp.website_id',
       'features.crispid',
+      'features.crisp_id',
       'v2et.crisp.website_id',
       'v2et.crispid',
+      'v2et.crisp_id',
     ]);
     final builtinProxyEnabled =
         _readBoolByPaths(map, const [
@@ -250,6 +257,27 @@ Map<String, dynamic>? _asMap(Object? value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) {
     return value.map((k, v) => MapEntry(k.toString(), v));
+  }
+  if (value is String) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+  if (value is List<int>) {
+    try {
+      final text = utf8.decode(value, allowMalformed: true);
+      return _asMap(text);
+    } catch (_) {
+      return null;
+    }
   }
   return null;
 }

@@ -66,6 +66,18 @@ class V2etLoginPage extends HookConsumerWidget {
     final passwordController = useTextEditingController(
       text: savedCredentials?.password ?? '',
     );
+    useEffect(() {
+      final savedEmail = savedCredentials?.email ?? '';
+      final savedPassword = savedCredentials?.password ?? '';
+      if (savedEmail.isNotEmpty && emailController.text != savedEmail) {
+        emailController.text = savedEmail;
+      }
+      if (savedPassword.isNotEmpty &&
+          passwordController.text != savedPassword) {
+        passwordController.text = savedPassword;
+      }
+      return null;
+    }, [savedCredentials?.email, savedCredentials?.password]);
     final loading = useState(false);
     final authMode = useState(_AuthMode.login);
     final rememberPassword = useState(true);
@@ -97,8 +109,10 @@ class V2etLoginPage extends HookConsumerWidget {
           requireInviteCode: false,
           emailWhitelistSuffixes: [],
         );
-    final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+    final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
+    final runtimeConfig = runtimeConfigAsync.valueOrNull;
     final supportUri = buildV2etSupportUri(runtimeConfig);
+    final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
 
     final modeTitle = switch (authMode.value) {
       _AuthMode.login => tr('登录', 'Login'),
@@ -169,20 +183,38 @@ class V2etLoginPage extends HookConsumerWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2F8),
-      floatingActionButton: supportUri == null
+      floatingActionButton: !showSupportFab
           ? null
           : FloatingActionButton(
               mini: true,
               backgroundColor: const Color(0xFF5A3D89),
               foregroundColor: Colors.white,
               onPressed: () async {
+                var uri = supportUri;
+                if (uri == null) {
+                  ref.invalidate(v2etRuntimeConfigProvider);
+                  final refreshed = await ref
+                      .read(v2etRuntimeConfigProvider.future)
+                      .catchError((_) => null);
+                  uri = buildV2etSupportUri(refreshed);
+                }
+                if (uri == null) {
+                  if (context.mounted) {
+                    showV2etNotice(
+                      context,
+                      tr('未配置客服入口', 'Support is not configured'),
+                      error: true,
+                    );
+                  }
+                  return;
+                }
                 var opened = await launchUrl(
-                  supportUri,
+                  uri,
                   mode: LaunchMode.inAppWebView,
                 );
                 if (!opened) {
                   opened = await launchUrl(
-                    supportUri,
+                    uri,
                     mode: LaunchMode.externalApplication,
                   );
                 }

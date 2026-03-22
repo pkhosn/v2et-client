@@ -75,8 +75,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
     if (v2etMode) {
       final actions = _actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode);
-      final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+      final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
+      final runtimeConfig = runtimeConfigAsync.valueOrNull;
       final supportUri = buildV2etSupportUri(runtimeConfig);
+      final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
 
       useEffect(() {
         final port = runtimeConfig?.defaultPort;
@@ -108,16 +110,30 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                     Expanded(child: navigationShell),
                   ],
                 ),
-          floatingActionButton: supportUri == null
+          floatingActionButton: !showSupportFab
               ? null
               : FloatingActionButton(
                   mini: true,
                   backgroundColor: const Color(0xFF5A3D89),
                   foregroundColor: Colors.white,
                   onPressed: () async {
-                    var opened = await launchUrl(supportUri, mode: LaunchMode.inAppWebView);
+                    var uri = supportUri;
+                    if (uri == null) {
+                      ref.invalidate(v2etRuntimeConfigProvider);
+                      final refreshed = await ref.read(v2etRuntimeConfigProvider.future).catchError((_) => null);
+                      uri = buildV2etSupportUri(refreshed);
+                    }
+                    if (uri == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(zh ? '未配置客服入口' : 'Support is not configured')));
+                      }
+                      return;
+                    }
+                    var opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
                     if (!opened) {
-                      opened = await launchUrl(supportUri, mode: LaunchMode.externalApplication);
+                      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
                     }
                   },
                   child: const Icon(Icons.support_agent_rounded),

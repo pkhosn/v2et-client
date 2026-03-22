@@ -396,7 +396,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                   backgroundColor: const Color(0xFFF5F2F8),
                                   insetPadding: EdgeInsets.symmetric(
                                     horizontal: isMobileSheet ? 12 : 120,
-                                    vertical: isMobileSheet ? 24 : 26,
+                                    vertical: isMobileSheet ? 44 : 46,
                                   ),
                                   child: Consumer(
                                     builder: (context, sheetRef, _) {
@@ -455,7 +455,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                               ),
                                                         ),
                                                         const Spacer(),
-                                                        OutlinedButton.icon(
+                                                        OutlinedButton(
                                                           onPressed: () {
                                                             modalLink.clear();
                                                             modalLinkLoading
@@ -483,16 +483,10 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                   ),
                                                             );
                                                           },
-                                                          icon: const Icon(
+                                                          child: const Icon(
                                                             Icons
                                                                 .refresh_rounded,
-                                                            size: 15,
-                                                          ),
-                                                          label: Text(
-                                                            tr(
-                                                              '刷新线路',
-                                                              'Refresh routes',
-                                                            ),
+                                                            size: 16,
                                                           ),
                                                         ),
                                                       ],
@@ -835,17 +829,32 @@ class V2etDashboardPage extends HookConsumerWidget {
       return 65535;
     }
 
-    final timer = Stopwatch()..start();
+    int? bestMs;
     try {
-      final res = await repo
-          .getCurrentIpInfo(CancelToken())
-          .run()
-          .timeout(const Duration(seconds: 8));
-      return res.match((_) => 65535, (_) => timer.elapsedMilliseconds);
-    } catch (_) {
-      return 65535;
+      for (var i = 0; i < 2; i++) {
+        final timer = Stopwatch()..start();
+        try {
+          final res = await repo
+              .getCurrentIpInfo(CancelToken())
+              .run()
+              .timeout(const Duration(seconds: 5));
+          final ms = res.match((_) => 65535, (_) => timer.elapsedMilliseconds);
+          if (ms > 0 && ms < 65535) {
+            if (bestMs == null || ms < bestMs) {
+              bestMs = ms;
+            }
+          }
+        } catch (_) {
+          // ignore single probe failure, retry once
+        } finally {
+          timer.stop();
+        }
+        if (i == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+        }
+      }
+      return bestMs ?? 65535;
     } finally {
-      timer.stop();
       if (restoreTag != null &&
           restoreTag.isNotEmpty &&
           restoreTag != outboundTag) {
@@ -885,6 +894,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final autoLabel = zh ? '自动选择' : 'Auto Select';
     final failoverLabel = zh ? '故障转移' : 'Failover';
     final currentGroupTag = _readGroupTag(proxyGroup) ?? 'select';
+    final currentSelectedTag = _readSelectedTag(proxyGroup) ?? currentGroupTag;
     final autoSelectTag = resolveTag([
       autoLabel,
       'auto select',
@@ -907,7 +917,7 @@ class V2etDashboardPage extends HookConsumerWidget {
         tag: autoLabel,
         flag: '⚡',
         selectTag: autoSelectTag ?? currentGroupTag,
-        testTag: autoSelectTag ?? currentGroupTag,
+        testTag: autoSelectTag ?? currentSelectedTag,
         linkMs: linkOverrides['__auto__'],
         isSpecial: true,
       ),
@@ -918,7 +928,7 @@ class V2etDashboardPage extends HookConsumerWidget {
         tag: failoverLabel,
         flag: '🛡️',
         selectTag: failoverTag ?? currentGroupTag,
-        testTag: failoverTag ?? currentGroupTag,
+        testTag: failoverTag ?? currentSelectedTag,
         linkMs: linkOverrides['__failover__'],
         isSpecial: true,
       ),
@@ -967,7 +977,7 @@ class V2etDashboardPage extends HookConsumerWidget {
       socket = await Socket.connect(
         target.host,
         target.port,
-        timeout: const Duration(seconds: 2),
+        timeout: const Duration(seconds: 4),
       );
       return watch.elapsedMilliseconds;
     } catch (_) {
@@ -984,24 +994,27 @@ class V2etDashboardPage extends HookConsumerWidget {
     required Map<String, _NodeTarget> nodeTargets,
     required dynamic currentGroup,
   }) async {
-    final connected =
-        ref.read(connectionNotifierProvider).valueOrNull == const Connected();
-    if (!connected) {
-      final directTarget = nodeTargets[item.testTag];
-      if (directTarget != null) {
-        return _runTcpProbe(directTarget);
-      }
-      return 65535;
-    }
-
     final groupTag = _readGroupTag(currentGroup) ?? 'select';
     final restoreTag = _readSelectedTag(currentGroup);
-    return _runLinkProbe(
+    final linkProbe = await _runLinkProbe(
       ref,
       groupTag: groupTag,
       outboundTag: item.testTag,
       restoreTag: restoreTag,
     );
+    if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
+      return linkProbe;
+    }
+
+    final directTarget =
+        nodeTargets[item.testTag] ??
+        (item.isSpecial && restoreTag != null
+            ? nodeTargets[restoreTag]
+            : null);
+    if (directTarget != null) {
+      return _runTcpProbe(directTarget);
+    }
+    return 65535;
   }
 
   Future<void> _openRenewDialog(BuildContext context) async {

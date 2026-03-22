@@ -331,44 +331,125 @@ class _OfferCard extends ConsumerWidget {
                 }
               }
 
+              final featureLines = <(bool, String)>[];
+              for (final item in offer.features) {
+                final raw = item.trim();
+                if (raw.isEmpty) continue;
+                if (raw.startsWith('✓ ')) {
+                  featureLines.add((true, raw.substring(2).trim()));
+                } else if (raw.startsWith('✗ ')) {
+                  featureLines.add((false, raw.substring(2).trim()));
+                } else if (raw.startsWith('- ')) {
+                  featureLines.add((false, raw.substring(2).trim()));
+                } else {
+                  featureLines.add((true, raw));
+                }
+              }
+              if (featureLines.isEmpty) {
+                if (offer.traffic != null && offer.traffic! > 0) {
+                  featureLines.add((true, tr('每月流量 ', 'Monthly traffic ') + _humanBytes(offer.traffic!)));
+                }
+                if (offer.speed != null && offer.speed!.trim().isNotEmpty) {
+                  featureLines.add((true, tr('速率 ', 'Speed ') + offer.speed!.trim()));
+                }
+                if (offer.deviceLimit != null) {
+                  featureLines.add((true, tr('设备限制 ', 'Device limit ') + '${offer.deviceLimit}${tr('台', '')}'));
+                }
+              }
+
               return AlertDialog(
-                title: Text(tr('确认购买', 'Confirm purchase')),
+                titlePadding: const EdgeInsets.fromLTRB(20, 16, 10, 6),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(offer.name, style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900)),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close_rounded, size: 30),
+                    ),
+                  ],
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
                 content: SizedBox(
-                  width: 760,
+                  width: 840,
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(offer.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 10),
-                        Text(
-                          tr('套餐下可购买选项', 'Available billing options'),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F5FB),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE3DEE9)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final row in featureLines)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        row.$1 ? Icons.check_circle_outline_rounded : Icons.highlight_off_rounded,
+                                        size: 20,
+                                        color: row.$1 ? const Color(0xFF1E88E5) : const Color(0xFFB0B7C3),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          row.$2,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            color: row.$1 ? const Color(0xFF2B2B33) : const Color(0xFF9AA1AB),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 12),
+                        Text(tr('付款周期', 'Billing period'), style: const TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
-                        for (final entry in prices)
-                          RadioListTile<String>(
-                            dense: true,
-                            value: entry.$1,
-                            groupValue: selectedPeriod,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(_periodLabel(entry.$1)),
-                            subtitle: Text('¥ ${entry.$2.toStringAsFixed(2)}'),
-                            onChanged: (v) {
-                              if (v == null) return;
-                              setState(() => selectedPeriod = v);
-                            },
-                          ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: couponController,
-                          decoration: InputDecoration(
-                            labelText: tr('输入优惠码', 'Coupon code'),
-                            suffixIcon: TextButton(
-                              onPressed: checkingCoupon ? null : verifyCoupon,
-                              child: Text(checkingCoupon ? tr('验证中', 'Checking') : tr('验证', 'Verify')),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final entry in prices)
+                              ChoiceChip(
+                                selected: selectedPeriod == entry.$1,
+                                label: Text('${_periodLabel(entry.$1)}  ¥${entry.$2.toStringAsFixed(2)}'),
+                                onSelected: (_) {
+                                  setState(() => selectedPeriod = entry.$1);
+                                },
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: couponController,
+                                decoration: InputDecoration(
+                                  hintText: tr('输入优惠码', 'Coupon code'),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            FilledButton.tonalIcon(
+                              onPressed: checkingCoupon ? null : verifyCoupon,
+                              icon: const Icon(Icons.verified_outlined),
+                              label: Text(checkingCoupon ? tr('验证中', 'Checking') : tr('验证', 'Verify')),
+                            ),
+                          ],
                         ),
                         if (couponValid != null)
                           Padding(
@@ -378,48 +459,82 @@ class _OfferCard extends ConsumerWidget {
                               style: TextStyle(
                                 color: couponValid! ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
                                 fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<int>(
-                          value: selectedMethod.id,
-                          decoration: InputDecoration(labelText: tr('选择支付方式', 'Payment method')),
-                          items: [for (final m in methods) DropdownMenuItem(value: m.id, child: Text(m.name))],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            final found = methods.where((m) => m.id == value);
-                            if (found.isNotEmpty) {
-                              setState(() => selectedMethod = found.first);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2F3441),
-                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFFE9E6EC),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
                               Text(
-                                tr('订单总额', 'Order total'),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
+                                '${tr('套餐价格', 'Package')}: ¥${selectedPrice.$2.toStringAsFixed(2)}',
+                                style: const TextStyle(color: Color(0xFF494556), fontSize: 18),
                               ),
-                              const SizedBox(height: 8),
+                              const Spacer(),
                               Text(
-                                '${offer.name} x ${_periodLabel(selectedPrice.$1)}',
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '¥ ${selectedPrice.$2.toStringAsFixed(2)} CNY',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 30),
+                                '${tr('总计', 'Total')}: ¥${selectedPrice.$2.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Color(0xFF1BA64B),
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(tr('选择支付方式', 'Payment method'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            for (final m in methods)
+                              SizedBox(
+                                width: 180,
+                                child: FilledButton.tonalIcon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: selectedMethod.id == m.id
+                                        ? const Color(0xFF48BFF1)
+                                        : const Color(0xFFE4F5FC),
+                                    foregroundColor: selectedMethod.id == m.id ? Colors.white : const Color(0xFF207AA0),
+                                    minimumSize: const Size.fromHeight(44),
+                                  ),
+                                  onPressed: () {
+                                    setState(() => selectedMethod = m);
+                                  },
+                                  icon: const Icon(Icons.lock_outline_rounded),
+                                  label: Text(m.name, overflow: TextOverflow.ellipsis),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(46),
+                              backgroundColor: const Color(0xFF1F79D8),
+                            ),
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop(
+                                _PurchaseInput(
+                                  period: selectedPeriod,
+                                  paymentMethod: selectedMethod,
+                                  couponCode: couponController.text.trim(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.check_circle_outline_rounded),
+                            label: Text(tr('确定购买', 'Place order')),
                           ),
                         ),
                       ],
@@ -428,18 +543,6 @@ class _OfferCard extends ConsumerWidget {
                 ),
                 actions: [
                   TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('取消', 'Cancel'))),
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop(
-                        _PurchaseInput(
-                          period: selectedPeriod,
-                          paymentMethod: selectedMethod,
-                          couponCode: couponController.text.trim(),
-                        ),
-                      );
-                    },
-                    child: Text(tr('确定购买', 'Place order')),
-                  ),
                 ],
               );
             },

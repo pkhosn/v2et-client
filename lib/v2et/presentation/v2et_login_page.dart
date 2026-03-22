@@ -59,7 +59,7 @@ class V2etLoginPage extends HookConsumerWidget {
     final formKey = useMemoized(GlobalKey<FormState>.new);
     final panelConfigUrl =
         savedCredentials?.baseUrl.toString() ??
-        V2etBootstrapConfig.defaultPanelUrl;
+        V2etBootstrapConfig.defaultConfigUrl;
     final emailController = useTextEditingController(
       text: savedCredentials?.email ?? '',
     );

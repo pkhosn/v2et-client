@@ -1,5 +1,5 @@
 {
-  "api_url": "http://127.0.0.1/m",
+  "api_url": "http://v2et-board.xizdj.com",
   "features": {
     "show_notice_popup": true
   },

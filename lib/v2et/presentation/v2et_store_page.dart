@@ -265,6 +265,24 @@ class _OfferCard extends ConsumerWidget {
     return '${size.toStringAsFixed(size >= 100 ? 0 : 2)} ${units[unit]}';
   }
 
+  String _inlineErrorText(Object error) {
+    if (error is StateError) {
+      final text = error.message.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    if (error is DioException) {
+      if (error.response?.statusCode == 403) {
+        return tr('不能用于此套餐或账户无权限使用此优惠码', 'This coupon is not valid for this plan or account.');
+      }
+      if (error.response?.statusCode == 422) {
+        return tr('无效优惠码', 'Invalid coupon code');
+      }
+    }
+    final raw = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '').trim();
+    if (raw.isNotEmpty) return raw;
+    return tr('优惠码验证失败', 'Coupon check failed');
+  }
+
   Future<_PurchaseInput?> _openPurchaseDialog({
     required BuildContext context,
     required WidgetRef ref,
@@ -289,6 +307,7 @@ class _OfferCard extends ConsumerWidget {
           V2etPaymentMethod selectedMethod = methods.first;
           bool checkingCoupon = false;
           bool? couponValid;
+          String? couponMessage;
 
           return StatefulBuilder(
             builder: (ctx, setState) {
@@ -297,7 +316,10 @@ class _OfferCard extends ConsumerWidget {
               Future<void> verifyCoupon() async {
                 final code = couponController.text.trim();
                 if (code.isEmpty) {
-                  showV2etNotice(ctx, tr('请输入优惠码', 'Enter coupon code'), error: true);
+                  setState(() {
+                    couponValid = false;
+                    couponMessage = tr('请输入优惠码', 'Enter coupon code');
+                  });
                   return;
                 }
                 setState(() => checkingCoupon = true);
@@ -305,30 +327,17 @@ class _OfferCard extends ConsumerWidget {
                   final ok = await ref
                       .read(v2etPortalApiProvider)
                       .checkCoupon(session: session, planId: offer.id!, couponCode: code);
-                  setState(() => couponValid = ok);
-                  if (ctx.mounted) {
-                    showV2etNotice(
-                      ctx,
-                      ok ? tr('优惠码可用', 'Coupon is valid') : tr('优惠码不可用', 'Coupon is invalid'),
-                      error: !ok,
-                    );
-                  }
+                  setState(() {
+                    couponValid = ok;
+                    couponMessage = ok
+                        ? tr('优惠码可用', 'Coupon is valid')
+                        : tr('无效优惠码或不能用于此套餐', 'Invalid coupon or not applicable for this plan');
+                  });
                 } catch (e) {
-                  setState(() => couponValid = false);
-                  if (ctx.mounted) {
-                    if (e is DioException && e.response?.statusCode == 403) {
-                      showV2etNotice(
-                        ctx,
-                        tr(
-                          '优惠码验证被面板拒绝(403)，请检查面板优惠码权限设置',
-                          'Coupon check rejected with 403. Please check panel coupon permissions.',
-                        ),
-                        error: true,
-                      );
-                      return;
-                    }
-                    showV2etNotice(ctx, tr('优惠码验证失败: ', 'Coupon check failed: ') + e.toString(), error: true);
-                  }
+                  setState(() {
+                    couponValid = false;
+                    couponMessage = _inlineErrorText(e);
+                  });
                 } finally {
                   if (ctx.mounted) setState(() => checkingCoupon = false);
                 }
@@ -446,13 +455,13 @@ class _OfferCard extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        if (couponValid != null)
+                        if (couponMessage != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
-                              couponValid! ? tr('优惠码已通过验证', 'Coupon verified') : tr('优惠码无效', 'Coupon invalid'),
+                              couponMessage!,
                               style: TextStyle(
-                                color: couponValid! ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                                color: (couponValid ?? false) ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),

@@ -134,17 +134,22 @@ class V2etPortalApi {
   Future<bool> checkCoupon({required V2boardSession session, required int planId, required String couponCode}) async {
     final code = couponCode.trim();
     if (code.isEmpty) return false;
-    final resp = await _authPost(session, '/api/v1/user/coupon/check', data: {'code': code, 'plan_id': planId});
-    final payload = _readMapNullable(resp['data']) ?? _readMap(resp);
-    final type = _readInt(payload['type']) ?? _readInt(resp['type']);
-    if (type != null) {
-      return type != 0;
+    try {
+      final resp = await _authPost(session, '/api/v1/user/coupon/check', data: {'code': code, 'plan_id': planId});
+      final payload = _readMapNullable(resp['data']) ?? _readMap(resp);
+      final type = _readInt(payload['type']) ?? _readInt(resp['type']);
+      if (type != null) {
+        return type != 0;
+      }
+      final amount = _readNum(payload['amount']) ?? _readNum(payload['value']) ?? _readNum(payload['discount']);
+      if (amount != null) {
+        return amount >= 0;
+      }
+      return true;
+    } on DioException catch (e) {
+      final msg = _extractApiError(e.response?.data) ?? _readString(e.message) ?? 'Coupon check failed';
+      throw StateError(msg);
     }
-    final amount = _readNum(payload['amount']) ?? _readNum(payload['value']) ?? _readNum(payload['discount']);
-    if (amount != null) {
-      return amount >= 0;
-    }
-    return true;
   }
 
   Future<List<V2etPaymentMethod>> fetchPaymentMethods(V2boardSession session) async {
@@ -312,6 +317,45 @@ class V2etPortalApi {
 
   String? _readString(Object? value) {
     if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  String? _extractApiError(Object? value) {
+    final map = _readMapNullable(value);
+    if (map == null) return null;
+    for (final key in const ['message', 'msg', 'error']) {
+      final text = _readString(map[key]);
+      if (text != null) return text;
+    }
+    final data = _readMapNullable(map['data']);
+    if (data != null) {
+      for (final key in const ['message', 'msg', 'error']) {
+        final text = _readString(data[key]);
+        if (text != null) return text;
+      }
+      final errors = _readMapNullable(data['errors']);
+      if (errors != null) {
+        for (final v in errors.values) {
+          if (v is List && v.isNotEmpty) {
+            final first = _readString(v.first);
+            if (first != null) return first;
+          }
+          final text = _readString(v);
+          if (text != null) return text;
+        }
+      }
+    }
+    final errors = _readMapNullable(map['errors']);
+    if (errors != null) {
+      for (final v in errors.values) {
+        if (v is List && v.isNotEmpty) {
+          final first = _readString(v.first);
+          if (first != null) return first;
+        }
+        final text = _readString(v);
+        if (text != null) return text;
+      }
+    }
     return null;
   }
 

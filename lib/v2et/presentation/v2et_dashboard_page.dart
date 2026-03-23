@@ -393,6 +393,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                         loading: linkBusy,
                                                                         valueMs: item.linkMs,
                                                                         timeoutText: tr('超时', 'timeout'),
+                                                                        unavailableText: tr('需连接', 'connect first'),
                                                                         onTap: () async {
                                                                           modalLinkLoading.add(item.id);
                                                                           setModalState(() {});
@@ -403,10 +404,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                               nodeTargets: nodeTargets,
                                                                               currentGroup: group,
                                                                             );
-                                                                            modalLink[item.id] =
-                                                                                tested == null || tested <= 0
-                                                                                ? 65535
-                                                                                : tested;
+                                                                            modalLink[item.id] = tested ?? 65535;
                                                                             linkOverrides.value = {...modalLink};
                                                                           } finally {
                                                                             modalLinkLoading.remove(item.id);
@@ -742,6 +740,16 @@ class V2etDashboardPage extends HookConsumerWidget {
 
     final directTarget = nodeTargets[item.testTag];
 
+    if (!connected) {
+      if (directTarget == null) {
+        return 65535;
+      }
+      if (directTarget.tcpProbeAllowed) {
+        return _runTcpProbe(directTarget, timeout: const Duration(milliseconds: 2200));
+      }
+      return -2;
+    }
+
     final probeTimeout = (directTarget != null && !directTarget.tcpProbeAllowed)
         ? const Duration(seconds: 15)
         : const Duration(seconds: 8);
@@ -783,7 +791,7 @@ class V2etDashboardPage extends HookConsumerWidget {
 
     final candidates = nodeTargets.entries.where((e) => e.value.tcpProbeAllowed).toList();
     if (candidates.isEmpty) {
-      return 65535;
+      return -2;
     }
     final cap = min(8, candidates.length);
     final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 2500)));
@@ -1012,6 +1020,7 @@ class _LatencyAction extends StatelessWidget {
     required this.loading,
     required this.valueMs,
     required this.timeoutText,
+    required this.unavailableText,
     required this.onTap,
   });
 
@@ -1019,13 +1028,15 @@ class _LatencyAction extends StatelessWidget {
   final bool loading;
   final int? valueMs;
   final String timeoutText;
+  final String unavailableText;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final hasValue = valueMs != null;
+    final unavailable = hasValue && valueMs == -2;
     final timedOut = hasValue && (valueMs == null || valueMs == 65535 || valueMs! <= 0);
-    final fg = timedOut ? const Color(0xFFC62828) : const Color(0xFF1976D2);
+    final fg = unavailable ? const Color(0xFF8D95A3) : (timedOut ? const Color(0xFFC62828) : const Color(0xFF1976D2));
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1047,7 +1058,7 @@ class _LatencyAction extends StatelessWidget {
                 Icon(icon, size: 14, color: fg),
               if (hasValue) ...[
                 Text(
-                  timedOut ? timeoutText : '${valueMs}ms',
+                  unavailable ? unavailableText : (timedOut ? timeoutText : '${valueMs}ms'),
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
                 ),
               ],

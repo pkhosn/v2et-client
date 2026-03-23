@@ -125,6 +125,9 @@ class V2etLoginPage extends HookConsumerWidget {
 
         await ref.read(Preferences.enableV2etAdapter.notifier).update(true);
         final sub = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
+        final noPlan =
+            (sub.nodeCount != null && sub.nodeCount! <= 0) ||
+            (sub.transferEnableBytes != null && sub.transferEnableBytes! <= 0);
         ref.read(v2etSessionUnlockedProvider.notifier).state = true;
         ref.invalidate(v2etSessionProvider);
         ref.invalidate(v2etNoticesProvider);
@@ -133,12 +136,29 @@ class V2etLoginPage extends HookConsumerWidget {
         ref.invalidate(v2etOrdersProvider);
         ref.invalidate(v2etTrafficLogsProvider);
         ref.invalidate(v2etInviteInfoProvider);
-        unawaited(
-          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((_) {}),
-        );
+        if (!noPlan) {
+          unawaited(
+            ref
+                .read(addProfileNotifierProvider.notifier)
+                .addClipboard(sub.subscriptionUrl.toString())
+                .catchError((_) {}),
+          );
+        }
         if (!context.mounted) return;
-        if (context.mounted) showV2etNotice(context, tr('登录成功', 'Login success'), duration: const Duration(seconds: 1));
-        context.go('/home');
+        if (noPlan) {
+          showV2etNotice(
+            context,
+            tr('当前账号暂无有效套餐，请先购买套餐', 'No active plan found. Please purchase a plan first.'),
+            error: true,
+            duration: const Duration(seconds: 2),
+          );
+          context.go('/store');
+        } else {
+          if (context.mounted) {
+            showV2etNotice(context, tr('登录成功', 'Login success'), duration: const Duration(seconds: 1));
+          }
+          context.go('/home');
+        }
       } catch (e) {
         ref.read(v2etSessionUnlockedProvider.notifier).state = false;
         ref.invalidate(v2etSessionProvider);

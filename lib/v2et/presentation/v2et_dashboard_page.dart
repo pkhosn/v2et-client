@@ -255,7 +255,11 @@ class V2etDashboardPage extends HookConsumerWidget {
                               nodeTargets = refreshedMeta.targets;
                             }
                             if (tags.isEmpty && guard == _UsageGuard.ok) {
-                              showV2etNotice(context, tr('当前套餐暂无可用节点', 'No nodes found for this plan'));
+                              showV2etNotice(
+                                context,
+                                tr('当前账号暂无有效套餐，请先购买套餐', 'No active plan found. Please purchase a plan first.'),
+                                error: true,
+                              );
                               return;
                             }
                             final picked = await showDialog<String>(
@@ -487,8 +491,11 @@ class V2etDashboardPage extends HookConsumerWidget {
       }
       await repo.warmup();
       final sub = repo.readLastSubscription();
+      final nodeCount = sub?.nodeCount;
+      final transferEnableBytes = sub?.transferEnableBytes;
+      final noPlan = (nodeCount != null && nodeCount <= 0) || (transferEnableBytes != null && transferEnableBytes <= 0);
       final url = sub?.subscriptionUrl.toString().trim();
-      if (url != null && url.isNotEmpty) {
+      if (!noPlan && url != null && url.isNotEmpty) {
         await ref.read(addProfileNotifierProvider.notifier).addClipboard(url).catchError((_) {});
       }
       ref.invalidate(v2etSessionProvider);

@@ -22,17 +22,22 @@ import 'package:url_launcher/url_launcher.dart';
 
 enum _AuthMode { login, register, forgot }
 
+String _readApiError(Object error) {
+  if (error is StateError) {
+    final text = error.message.toString().trim();
+    if (text.isNotEmpty) return text;
+  }
+  final raw = error.toString();
+  return raw.replaceFirst(RegExp(r'^Bad state:\s*'), '').trim();
+}
+
 String _friendlyLoginError(Object error, bool zh) {
   final raw = error.toString();
   final message = raw.toLowerCase();
-  if (message.contains('不存在') ||
-      message.contains('not exist') ||
-      message.contains('not found')) {
+  if (message.contains('不存在') || message.contains('not exist') || message.contains('not found')) {
     return zh ? '登录失败：账号不存在' : 'Login failed: account does not exist';
   }
-  if (message.contains('密码') ||
-      message.contains('password') ||
-      message.contains('invalid credentials')) {
+  if (message.contains('密码') || message.contains('password') || message.contains('invalid credentials')) {
     return zh ? '登录失败：密码错误' : 'Login failed: incorrect password';
   }
   return (zh ? '登录失败：' : 'Login failed: ') + raw;
@@ -43,37 +48,26 @@ class V2etLoginPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final zh = Localizations.localeOf(
-      context,
-    ).languageCode.toLowerCase().startsWith('zh');
+    final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
     String tr(String a, String b) => zh ? a : b;
 
     final width = MediaQuery.sizeOf(context).width;
     final compact = PlatformUtils.isDesktop ? false : width < 900;
 
-    final savedCredentialsFuture = useMemoized(
-      () => ref.read(v2etRepositoryProvider).readSavedCredentials(),
-    );
+    final savedCredentialsFuture = useMemoized(() => ref.read(v2etRepositoryProvider).readSavedCredentials());
     final savedCredentials = useFuture(savedCredentialsFuture).data;
 
     final formKey = useMemoized(GlobalKey<FormState>.new);
-    final panelConfigUrl =
-        savedCredentials?.baseUrl.toString() ??
-        V2etBootstrapConfig.defaultConfigUrl;
-    final emailController = useTextEditingController(
-      text: savedCredentials?.email ?? '',
-    );
-    final passwordController = useTextEditingController(
-      text: savedCredentials?.password ?? '',
-    );
+    final panelConfigUrl = savedCredentials?.baseUrl.toString() ?? V2etBootstrapConfig.defaultConfigUrl;
+    final emailController = useTextEditingController(text: savedCredentials?.email ?? '');
+    final passwordController = useTextEditingController(text: savedCredentials?.password ?? '');
     useEffect(() {
       final savedEmail = savedCredentials?.email ?? '';
       final savedPassword = savedCredentials?.password ?? '';
       if (savedEmail.isNotEmpty && emailController.text != savedEmail) {
         emailController.text = savedEmail;
       }
-      if (savedPassword.isNotEmpty &&
-          passwordController.text != savedPassword) {
+      if (savedPassword.isNotEmpty && passwordController.text != savedPassword) {
         passwordController.text = savedPassword;
       }
       return null;
@@ -95,20 +89,12 @@ class V2etLoginPage extends HookConsumerWidget {
         final baseUrl = await resolvedBaseUrl();
         return await ref.read(v2boardApiProvider).fetchAuthConfig(baseUrl);
       } catch (_) {
-        return const V2boardAuthConfig(
-          requireEmailVerify: false,
-          requireInviteCode: false,
-          emailWhitelistSuffixes: [],
-        );
+        return const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
       }
     });
     final authConfig =
         useFuture(authConfigFuture).data ??
-        const V2boardAuthConfig(
-          requireEmailVerify: false,
-          requireInviteCode: false,
-          emailWhitelistSuffixes: [],
-        );
+        const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
     final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
     final runtimeConfig = runtimeConfigAsync.valueOrNull;
     final supportUri = buildV2etSupportUri(runtimeConfig);
@@ -121,14 +107,8 @@ class V2etLoginPage extends HookConsumerWidget {
     };
     final modeSubtitle = switch (authMode.value) {
       _AuthMode.login => tr('欢迎回来，请登录您的账号', 'Welcome back, please login'),
-      _AuthMode.register => tr(
-        '创建新账号以开始使用',
-        'Create a new account to continue',
-      ),
-      _AuthMode.forgot => tr(
-        '通过邮箱验证码重置密码',
-        'Reset your password via email verification',
-      ),
+      _AuthMode.register => tr('创建新账号以开始使用', 'Create a new account to continue'),
+      _AuthMode.forgot => tr('通过邮箱验证码重置密码', 'Reset your password via email verification'),
     };
 
     Future<void> submit() async {
@@ -144,9 +124,7 @@ class V2etLoginPage extends HookConsumerWidget {
         );
 
         await ref.read(Preferences.enableV2etAdapter.notifier).update(true);
-        final sub = await ref
-            .read(v2etRepositoryProvider)
-            .loginAndFetchSubscription(credentials);
+        final sub = await ref.read(v2etRepositoryProvider).loginAndFetchSubscription(credentials);
         ref.read(v2etSessionUnlockedProvider.notifier).state = true;
         ref.invalidate(v2etSessionProvider);
         ref.invalidate(v2etNoticesProvider);
@@ -156,18 +134,10 @@ class V2etLoginPage extends HookConsumerWidget {
         ref.invalidate(v2etTrafficLogsProvider);
         ref.invalidate(v2etInviteInfoProvider);
         unawaited(
-          ref
-              .read(addProfileNotifierProvider.notifier)
-              .addClipboard(sub.subscriptionUrl.toString())
-              .catchError((_) {}),
+          ref.read(addProfileNotifierProvider.notifier).addClipboard(sub.subscriptionUrl.toString()).catchError((_) {}),
         );
         if (!context.mounted) return;
-        if (context.mounted)
-          showV2etNotice(
-            context,
-            tr('登录成功', 'Login success'),
-            duration: const Duration(seconds: 1),
-          );
+        if (context.mounted) showV2etNotice(context, tr('登录成功', 'Login success'), duration: const Duration(seconds: 1));
         context.go('/home');
       } catch (e) {
         ref.read(v2etSessionUnlockedProvider.notifier).state = false;
@@ -193,30 +163,18 @@ class V2etLoginPage extends HookConsumerWidget {
                 var uri = supportUri;
                 if (uri == null) {
                   ref.invalidate(v2etRuntimeConfigProvider);
-                  final refreshed = await ref
-                      .read(v2etRuntimeConfigProvider.future)
-                      .catchError((_) => null);
+                  final refreshed = await ref.read(v2etRuntimeConfigProvider.future).catchError((_) => null);
                   uri = buildV2etSupportUri(refreshed);
                 }
                 if (uri == null) {
                   if (context.mounted) {
-                    showV2etNotice(
-                      context,
-                      tr('未配置客服入口', 'Support is not configured'),
-                      error: true,
-                    );
+                    showV2etNotice(context, tr('未配置客服入口', 'Support is not configured'), error: true);
                   }
                   return;
                 }
-                var opened = await launchUrl(
-                  uri,
-                  mode: LaunchMode.inAppWebView,
-                );
+                var opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
                 if (!opened) {
-                  opened = await launchUrl(
-                    uri,
-                    mode: LaunchMode.externalApplication,
-                  );
+                  opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
               child: const Icon(Icons.support_agent_rounded),
@@ -244,23 +202,13 @@ class V2etLoginPage extends HookConsumerWidget {
                           PopupMenuButton<AppLocale>(
                             initialValue: locale,
                             onSelected: (value) async {
-                              await ref
-                                  .read(localePreferencesProvider.notifier)
-                                  .changeLocale(value);
+                              await ref.read(localePreferencesProvider.notifier).changeLocale(value);
                             },
                             itemBuilder: (_) => AppLocale.values
-                                .map(
-                                  (e) => PopupMenuItem<AppLocale>(
-                                    value: e,
-                                    child: Text(e.localeName),
-                                  ),
-                                )
+                                .map((e) => PopupMenuItem<AppLocale>(value: e, child: Text(e.localeName)))
                                 .toList(),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2E2250),
                                 borderRadius: BorderRadius.circular(12),
@@ -270,11 +218,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                 children: [
                                   const Text(
                                     '文',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -300,18 +244,11 @@ class V2etLoginPage extends HookConsumerWidget {
                               height: 170,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(
-                                    0xFF6E6294,
-                                  ).withOpacity(0.35),
-                                  width: 2,
-                                ),
+                                border: Border.all(color: const Color(0xFF6E6294).withOpacity(0.35), width: 2),
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(24),
-                                child: Image.asset(
-                                  'assets/images/tray_icon.png',
-                                ),
+                                child: Image.asset('assets/images/tray_icon.png'),
                               ),
                             ),
                             const SizedBox(height: 30),
@@ -327,10 +264,7 @@ class V2etLoginPage extends HookConsumerWidget {
                             const SizedBox(height: 10),
                             Text(
                               tr('世界触手可得', 'Reach the world'),
-                              style: const TextStyle(
-                                color: Color(0xFFD2CCE3),
-                                fontSize: 22,
-                              ),
+                              style: const TextStyle(color: Color(0xFFD2CCE3), fontSize: 22),
                             ),
                           ],
                         ),
@@ -338,10 +272,7 @@ class V2etLoginPage extends HookConsumerWidget {
                       const Spacer(),
                       const Text(
                         '© 2026 V2ET. All rights reserved.',
-                        style: TextStyle(
-                          color: Color(0xFFC5BED7),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Color(0xFFC5BED7), fontSize: 12),
                       ),
                     ],
                   ),
@@ -354,12 +285,7 @@ class V2etLoginPage extends HookConsumerWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 760),
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 28 : 70,
-                    24,
-                    compact ? 28 : 84,
-                    24,
-                  ),
+                  padding: EdgeInsets.fromLTRB(compact ? 28 : 70, 24, compact ? 28 : 84, 24),
                   child: SingleChildScrollView(
                     child: Form(
                       key: formKey,
@@ -372,25 +298,13 @@ class V2etLoginPage extends HookConsumerWidget {
                                 PopupMenuButton<AppLocale>(
                                   initialValue: locale,
                                   onSelected: (value) async {
-                                    await ref
-                                        .read(
-                                          localePreferencesProvider.notifier,
-                                        )
-                                        .changeLocale(value);
+                                    await ref.read(localePreferencesProvider.notifier).changeLocale(value);
                                   },
                                   itemBuilder: (_) => AppLocale.values
-                                      .map(
-                                        (e) => PopupMenuItem<AppLocale>(
-                                          value: e,
-                                          child: Text(e.localeName),
-                                        ),
-                                      )
+                                      .map((e) => PopupMenuItem<AppLocale>(value: e, child: Text(e.localeName)))
                                       .toList(),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(10),
                                       color: const Color(0xFFEDE7F4),
@@ -398,13 +312,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Text(
-                                          '文',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 13,
-                                          ),
-                                        ),
+                                        const Text('文', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                                         const SizedBox(width: 4),
                                         Text(locale.localeName),
                                       ],
@@ -425,13 +333,7 @@ class V2etLoginPage extends HookConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            modeSubtitle,
-                            style: const TextStyle(
-                              color: Color(0xFF5F5A67),
-                              fontSize: 16,
-                            ),
-                          ),
+                          Text(modeSubtitle, style: const TextStyle(color: Color(0xFF5F5A67), fontSize: 16)),
                           const SizedBox(height: 56),
                           if (authMode.value == _AuthMode.login) ...[
                             _V2etInputField(
@@ -439,10 +341,7 @@ class V2etLoginPage extends HookConsumerWidget {
                               hint: tr('请输入邮箱', 'Enter email'),
                               icon: Icons.mail_outline_rounded,
                               controller: emailController,
-                              validator: (value) =>
-                                  (value?.trim().isEmpty ?? true)
-                                  ? tr('请输入邮箱', 'Enter email')
-                                  : null,
+                              validator: (value) => (value?.trim().isEmpty ?? true) ? tr('请输入邮箱', 'Enter email') : null,
                             ),
                             const SizedBox(height: 16),
                             _V2etInputField(
@@ -452,18 +351,13 @@ class V2etLoginPage extends HookConsumerWidget {
                               controller: passwordController,
                               obscureText: obscurePassword.value,
                               trailing: IconButton(
-                                onPressed: () => obscurePassword.value =
-                                    !obscurePassword.value,
+                                onPressed: () => obscurePassword.value = !obscurePassword.value,
                                 icon: Icon(
-                                  obscurePassword.value
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
+                                  obscurePassword.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                                   color: const Color(0xFF5C5966),
                                 ),
                               ),
-                              validator: (value) => (value?.isEmpty ?? true)
-                                  ? tr('请输入密码', 'Enter password')
-                                  : null,
+                              validator: (value) => (value?.isEmpty ?? true) ? tr('请输入密码', 'Enter password') : null,
                             ),
                             const SizedBox(height: 14),
                             Row(
@@ -471,15 +365,13 @@ class V2etLoginPage extends HookConsumerWidget {
                                 _LabeledCheckbox(
                                   label: tr('记住密码', 'Remember password'),
                                   value: rememberPassword.value,
-                                  onChanged: (v) =>
-                                      rememberPassword.value = v ?? false,
+                                  onChanged: (v) => rememberPassword.value = v ?? false,
                                 ),
                                 const Spacer(),
                                 _LabeledCheckbox(
                                   label: tr('自动登录', 'Auto Login'),
                                   value: autoLogin.value,
-                                  onChanged: (v) =>
-                                      autoLogin.value = v ?? false,
+                                  onChanged: (v) => autoLogin.value = v ?? false,
                                 ),
                               ],
                             ),
@@ -491,9 +383,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                   backgroundColor: const Color(0xFF573C87),
                                   foregroundColor: Colors.white,
                                   minimumSize: const Size.fromHeight(56),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                 ),
                                 onPressed: loading.value ? null : submit,
                                 child: Row(
@@ -501,13 +391,8 @@ class V2etLoginPage extends HookConsumerWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      loading.value
-                                          ? tr('登录中...', 'Logging in...')
-                                          : tr('登录', 'Login'),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 18,
-                                      ),
+                                      loading.value ? tr('登录中...', 'Logging in...') : tr('登录', 'Login'),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                                     ),
                                     const SizedBox(width: 8),
                                     const Icon(Icons.login_rounded, size: 20),
@@ -523,9 +408,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                 if (baseUrl == null) {
                                   return const Center(
                                     child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 24,
-                                      ),
+                                      padding: EdgeInsets.symmetric(vertical: 24),
                                       child: CircularProgressIndicator(),
                                     ),
                                   );
@@ -537,16 +420,14 @@ class V2etLoginPage extends HookConsumerWidget {
                                     baseUrl: baseUrl,
                                     config: authConfig,
                                     api: api,
-                                    onDone: () =>
-                                        authMode.value = _AuthMode.login,
+                                    onDone: () => authMode.value = _AuthMode.login,
                                   );
                                 }
                                 return _ForgotPasswordPanel(
                                   zh: zh,
                                   baseUrl: baseUrl,
                                   api: api,
-                                  onDone: () =>
-                                      authMode.value = _AuthMode.login,
+                                  onDone: () => authMode.value = _AuthMode.login,
                                 );
                               },
                             ),
@@ -557,8 +438,7 @@ class V2etLoginPage extends HookConsumerWidget {
                               TextButton.icon(
                                 onPressed: loading.value
                                     ? null
-                                    : () => authMode.value =
-                                          authMode.value == _AuthMode.register
+                                    : () => authMode.value = authMode.value == _AuthMode.register
                                           ? _AuthMode.login
                                           : _AuthMode.register,
                                 icon: Icon(
@@ -577,14 +457,11 @@ class V2etLoginPage extends HookConsumerWidget {
                               TextButton.icon(
                                 onPressed: loading.value
                                     ? null
-                                    : () => authMode.value =
-                                          authMode.value == _AuthMode.forgot
+                                    : () => authMode.value = authMode.value == _AuthMode.forgot
                                           ? _AuthMode.login
                                           : _AuthMode.forgot,
                                 icon: Icon(
-                                  authMode.value == _AuthMode.forgot
-                                      ? Icons.login_rounded
-                                      : Icons.help_outline_rounded,
+                                  authMode.value == _AuthMode.forgot ? Icons.login_rounded : Icons.help_outline_rounded,
                                   size: 18,
                                 ),
                                 label: Text(
@@ -669,9 +546,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
   bool _validateEmailWhitelist(String value) {
     final whitelist = widget.config.emailWhitelistSuffixes;
     if (whitelist.isEmpty) return true;
-    return whitelist.any(
-      (suffix) => value.toLowerCase().endsWith(suffix.toLowerCase()),
-    );
+    return whitelist.any((suffix) => value.toLowerCase().endsWith(suffix.toLowerCase()));
   }
 
   @override
@@ -687,10 +562,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tr('注册账号', 'Register account'),
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-          ),
+          Text(tr('注册账号', 'Register account'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
           const SizedBox(height: 10),
           if (suffixes.isNotEmpty) ...[
             Row(
@@ -699,9 +571,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                   flex: 3,
                   child: TextField(
                     controller: email,
-                    decoration: InputDecoration(
-                      labelText: tr('邮箱用户名', 'Email username'),
-                    ),
+                    decoration: InputDecoration(labelText: tr('邮箱用户名', 'Email username')),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -710,15 +580,9 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                   child: DropdownButtonFormField<String>(
                     initialValue: selectedSuffix,
                     items: suffixes
-                        .map(
-                          (suffix) => DropdownMenuItem<String>(
-                            value: suffix,
-                            child: Text(suffix),
-                          ),
-                        )
+                        .map((suffix) => DropdownMenuItem<String>(value: suffix, child: Text(suffix)))
                         .toList(),
-                    onChanged: (value) =>
-                        setState(() => selectedSuffix = value),
+                    onChanged: (value) => setState(() => selectedSuffix = value),
                     decoration: InputDecoration(labelText: tr('后缀', 'Suffix')),
                   ),
                 ),
@@ -749,9 +613,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                 Expanded(
                   child: TextField(
                     controller: emailCode,
-                    decoration: InputDecoration(
-                      labelText: tr('邮箱验证码', 'Email code'),
-                    ),
+                    decoration: InputDecoration(labelText: tr('邮箱验证码', 'Email code')),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -762,31 +624,17 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                           final builtEmail = _composeEmail();
                           if (builtEmail.isEmpty) return;
                           if (!_validateEmailWhitelist(builtEmail)) {
-                            showV2etNotice(
-                              context,
-                              tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'),
-                              error: true,
-                            );
+                            showV2etNotice(context, tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'), error: true);
                             return;
                           }
                           setState(() => sendingCode = true);
                           try {
-                            await widget.api.sendEmailVerifyCode(
-                              baseUrl: widget.baseUrl,
-                              email: builtEmail,
-                            );
+                            await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: builtEmail);
                             if (!mounted) return;
-                            showV2etNotice(
-                              context,
-                              tr('验证码已发送', 'Verification code sent'),
-                            );
+                            showV2etNotice(context, tr('验证码已发送', 'Verification code sent'));
                           } catch (e) {
                             if (!mounted) return;
-                            showV2etNotice(
-                              context,
-                              tr('发送失败: ', 'Failed: ') + e.toString(),
-                              error: true,
-                            );
+                            showV2etNotice(context, tr('发送失败: ', 'Failed: ') + _readApiError(e), error: true);
                           } finally {
                             if (mounted) setState(() => sendingCode = false);
                           }
@@ -806,19 +654,11 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                       final p = password.text;
                       if (e.isEmpty || p.isEmpty) return;
                       if (!_validateEmailWhitelist(e)) {
-                        showV2etNotice(
-                          context,
-                          tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'),
-                          error: true,
-                        );
+                        showV2etNotice(context, tr('邮箱后缀不在白名单中', 'Email suffix is not allowed'), error: true);
                         return;
                       }
-                      if (widget.config.requireEmailVerify &&
-                          emailCode.text.trim().isEmpty)
-                        return;
-                      if (widget.config.requireInviteCode &&
-                          inviteCode.text.trim().isEmpty)
-                        return;
+                      if (widget.config.requireEmailVerify && emailCode.text.trim().isEmpty) return;
+                      if (widget.config.requireInviteCode && inviteCode.text.trim().isEmpty) return;
                       setState(() => submitting = true);
                       try {
                         await widget.api.register(
@@ -830,17 +670,10 @@ class _RegisterPanelState extends State<_RegisterPanel> {
                         );
                         if (!mounted) return;
                         widget.onDone();
-                        showV2etNotice(
-                          context,
-                          tr('注册成功，请登录', 'Register success, please login'),
-                        );
+                        showV2etNotice(context, tr('注册成功，请登录', 'Register success, please login'));
                       } catch (e) {
                         if (!mounted) return;
-                        showV2etNotice(
-                          context,
-                          tr('注册失败: ', 'Register failed: ') + e.toString(),
-                          error: true,
-                        );
+                        showV2etNotice(context, tr('注册失败: ', 'Register failed: ') + _readApiError(e), error: true);
                       } finally {
                         if (mounted) setState(() => submitting = false);
                       }
@@ -855,12 +688,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
 }
 
 class _ForgotPasswordPanel extends StatefulWidget {
-  const _ForgotPasswordPanel({
-    required this.zh,
-    required this.baseUrl,
-    required this.api,
-    required this.onDone,
-  });
+  const _ForgotPasswordPanel({required this.zh, required this.baseUrl, required this.api, required this.onDone});
 
   final bool zh;
   final Uri baseUrl;
@@ -900,10 +728,7 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tr('重置密码', 'Reset password'),
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-          ),
+          Text(tr('重置密码', 'Reset password'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
           const SizedBox(height: 10),
           TextField(
             controller: email,
@@ -914,9 +739,7 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
               Expanded(
                 child: TextField(
                   controller: emailCode,
-                  decoration: InputDecoration(
-                    labelText: tr('邮箱验证码', 'Email code'),
-                  ),
+                  decoration: InputDecoration(labelText: tr('邮箱验证码', 'Email code')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -928,22 +751,12 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
                         if (e.isEmpty) return;
                         setState(() => sendingCode = true);
                         try {
-                          await widget.api.sendEmailVerifyCode(
-                            baseUrl: widget.baseUrl,
-                            email: e,
-                          );
+                          await widget.api.sendEmailVerifyCode(baseUrl: widget.baseUrl, email: e);
                           if (!mounted) return;
-                          showV2etNotice(
-                            context,
-                            tr('验证码已发送', 'Verification code sent'),
-                          );
+                          showV2etNotice(context, tr('验证码已发送', 'Verification code sent'));
                         } catch (e) {
                           if (!mounted) return;
-                          showV2etNotice(
-                            context,
-                            tr('发送失败: ', 'Failed: ') + e.toString(),
-                            error: true,
-                          );
+                          showV2etNotice(context, tr('发送失败: ', 'Failed: ') + _readApiError(e), error: true);
                         } finally {
                           if (mounted) setState(() => sendingCode = false);
                         }
@@ -970,25 +783,13 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
                       if (e.isEmpty || p.isEmpty || c.isEmpty) return;
                       setState(() => submitting = true);
                       try {
-                        await widget.api.resetPassword(
-                          baseUrl: widget.baseUrl,
-                          email: e,
-                          password: p,
-                          emailCode: c,
-                        );
+                        await widget.api.resetPassword(baseUrl: widget.baseUrl, email: e, password: p, emailCode: c);
                         if (!mounted) return;
                         widget.onDone();
-                        showV2etNotice(
-                          context,
-                          tr('重置成功，请登录', 'Reset success, please login'),
-                        );
+                        showV2etNotice(context, tr('重置成功，请登录', 'Reset success, please login'));
                       } catch (e) {
                         if (!mounted) return;
-                        showV2etNotice(
-                          context,
-                          tr('重置失败: ', 'Reset failed: ') + e.toString(),
-                          error: true,
-                        );
+                        showV2etNotice(context, tr('重置失败: ', 'Reset failed: ') + _readApiError(e), error: true);
                       } finally {
                         if (mounted) setState(() => submitting = false);
                       }
@@ -1026,10 +827,7 @@ class _V2etInputField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 16, color: Color(0xFF2D2A36)),
-        ),
+        Text(label, style: const TextStyle(fontSize: 16, color: Color(0xFF2D2A36))),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -1044,24 +842,15 @@ class _V2etInputField extends StatelessWidget {
             fillColor: const Color(0xFFF4F1F8),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: Color(0xFF94909E),
-                width: 1.3,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF94909E), width: 1.3),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: Color(0xFF94909E),
-                width: 1.3,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF94909E), width: 1.3),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: Color(0xFF573C87),
-                width: 1.5,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF573C87), width: 1.5),
             ),
           ),
         ),
@@ -1071,11 +860,7 @@ class _V2etInputField extends StatelessWidget {
 }
 
 class _LabeledCheckbox extends StatelessWidget {
-  const _LabeledCheckbox({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
+  const _LabeledCheckbox({required this.label, required this.value, required this.onChanged});
 
   final String label;
   final bool value;
@@ -1092,10 +877,7 @@ class _LabeledCheckbox extends StatelessWidget {
           side: const BorderSide(color: Color(0xFF6D6878)),
           visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
         ),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 15, color: Color(0xFF2D2A36)),
-        ),
+        Text(label, style: const TextStyle(fontSize: 15, color: Color(0xFF2D2A36))),
       ],
     );
   }

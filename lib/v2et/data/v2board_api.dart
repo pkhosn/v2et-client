@@ -92,13 +92,12 @@ class V2boardApiImpl implements V2boardApi {
 
   @override
   Future<V2boardSession> login(V2boardCredentials credentials) async {
-    final uri = _joinApi(credentials.baseUrl, '/api/v1/passport/auth/login');
     late final Response<Object?> response;
     try {
-      response = await _dio.postUri<Object?>(
-        uri,
+      response = await _postGuestForm(
+        baseUrl: credentials.baseUrl,
+        path: '/api/v1/passport/auth/login',
         data: {'email': credentials.email, 'password': credentials.password},
-        options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
       );
     } on DioException catch (error) {
       final message =
@@ -128,6 +127,18 @@ class V2boardApiImpl implements V2boardApi {
       for (final candidate in candidates) {
         final text = _readString(candidate);
         if (text != null) return text;
+      }
+
+      final errors = _readMapNullable(json['errors']) ?? _readMapNullable(_readMapNullable(json['data'])?['errors']);
+      if (errors != null) {
+        for (final value in errors.values) {
+          if (value is List && value.isNotEmpty) {
+            final first = _readString(value.first);
+            if (first != null) return first;
+          }
+          final text = _readString(value);
+          if (text != null) return text;
+        }
       }
     } catch (_) {
       return _readString(responseData);
@@ -179,12 +190,13 @@ class V2boardApiImpl implements V2boardApi {
 
   @override
   Future<void> sendEmailVerifyCode({required Uri baseUrl, required String email}) async {
-    final uri = _joinApi(baseUrl, '/api/v1/passport/comm/sendEmailVerify');
-    await _dio.postUri<Object?>(
-      uri,
-      data: {'email': email},
-      options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
-    );
+    try {
+      await _postGuestForm(baseUrl: baseUrl, path: '/api/v1/passport/comm/sendEmailVerify', data: {'email': email});
+    } on DioException catch (error) {
+      final message =
+          _extractApiMessage(error.response?.data) ?? _readString(error.message) ?? 'V2Board send email code failed.';
+      throw StateError(message);
+    }
   }
 
   @override
@@ -195,7 +207,6 @@ class V2boardApiImpl implements V2boardApi {
     String? emailCode,
     String? inviteCode,
   }) async {
-    final uri = _joinApi(baseUrl, '/api/v1/passport/auth/register');
     final payload = <String, Object>{'email': email, 'password': password, 'password_confirmation': password};
     if (emailCode != null && emailCode.trim().isNotEmpty) {
       payload['email_code'] = emailCode.trim();
@@ -203,11 +214,13 @@ class V2boardApiImpl implements V2boardApi {
     if (inviteCode != null && inviteCode.trim().isNotEmpty) {
       payload['invite_code'] = inviteCode.trim();
     }
-    await _dio.postUri<Object?>(
-      uri,
-      data: payload,
-      options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
-    );
+    try {
+      await _postGuestForm(baseUrl: baseUrl, path: '/api/v1/passport/auth/register', data: payload);
+    } on DioException catch (error) {
+      final message =
+          _extractApiMessage(error.response?.data) ?? _readString(error.message) ?? 'V2Board register request failed.';
+      throw StateError(message);
+    }
   }
 
   @override
@@ -217,12 +230,50 @@ class V2boardApiImpl implements V2boardApi {
     required String password,
     required String emailCode,
   }) async {
-    final uri = _joinApi(baseUrl, '/api/v1/passport/auth/forget');
-    await _dio.postUri<Object?>(
-      uri,
-      data: {'email': email, 'email_code': emailCode, 'password': password, 'password_confirmation': password},
-      options: Options(headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}),
-    );
+    try {
+      await _postGuestForm(
+        baseUrl: baseUrl,
+        path: '/api/v1/passport/auth/forget',
+        data: {'email': email, 'email_code': emailCode, 'password': password, 'password_confirmation': password},
+      );
+    } on DioException catch (error) {
+      final message =
+          _extractApiMessage(error.response?.data) ??
+          _readString(error.message) ??
+          'V2Board reset password request failed.';
+      throw StateError(message);
+    }
+  }
+
+  Future<Response<Object?>> _postGuestForm({
+    required Uri baseUrl,
+    required String path,
+    required Map<String, Object?> data,
+  }) async {
+    final uri = _joinApi(baseUrl, path);
+    final referer = baseUrl.replace(path: '/').toString();
+    final origin = '${baseUrl.scheme}://${baseUrl.host}';
+    final headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': referer,
+      'Origin': origin,
+    };
+
+    try {
+      return await _dio.postUri<Object?>(
+        uri,
+        data: FormData.fromMap(data),
+        options: Options(headers: headers),
+      );
+    } on DioException {
+      return _dio.postUri<Object?>(
+        uri,
+        data: data,
+        options: Options(headers: headers),
+      );
+    }
   }
 
   Future<Map<String, dynamic>> _fetchSubscribeJson(Uri baseUrl, String token) async {

@@ -120,28 +120,55 @@ class V2boardApiImpl implements V2boardApi {
         json['message'],
         json['msg'],
         json['error'],
+        json['detail'],
         _readMapNullable(json['data'])?['message'],
         _readMapNullable(json['data'])?['msg'],
         _readMapNullable(json['data'])?['error'],
+        _readMapNullable(json['data'])?['detail'],
+        json['errors'],
+        _readMapNullable(json['data'])?['errors'],
       ];
       for (final candidate in candidates) {
-        final text = _readString(candidate);
+        final text = _extractTextDeep(candidate);
         if (text != null) return text;
       }
+    } catch (_) {
+      return _extractTextDeep(responseData);
+    }
+    return null;
+  }
 
-      final errors = _readMapNullable(json['errors']) ?? _readMapNullable(_readMapNullable(json['data'])?['errors']);
-      if (errors != null) {
-        for (final value in errors.values) {
-          if (value is List && value.isNotEmpty) {
-            final first = _readString(value.first);
-            if (first != null) return first;
-          }
-          final text = _readString(value);
-          if (text != null) return text;
+  String? _extractTextDeep(Object? value, [int depth = 0]) {
+    if (value == null || depth > 6) {
+      return null;
+    }
+    final direct = _readString(value);
+    if (direct != null) {
+      return direct;
+    }
+    if (value is List) {
+      for (final item in value) {
+        final text = _extractTextDeep(item, depth + 1);
+        if (text != null) {
+          return text;
         }
       }
-    } catch (_) {
-      return _readString(responseData);
+      return null;
+    }
+    if (value is Map) {
+      final map = _readMap(value);
+      for (final key in const ['message', 'msg', 'error', 'detail']) {
+        final text = _extractTextDeep(map[key], depth + 1);
+        if (text != null) {
+          return text;
+        }
+      }
+      for (final entry in map.entries) {
+        final text = _extractTextDeep(entry.value, depth + 1);
+        if (text != null) {
+          return text;
+        }
+      }
     }
     return null;
   }

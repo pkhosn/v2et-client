@@ -725,6 +725,9 @@ class V2etDashboardPage extends HookConsumerWidget {
     final restoreTag = _readSelectedTag(currentGroup);
 
     if (item.isSpecial) {
+      if (!connected) {
+        return _runSpecialModeProbe(item, nodeTargets, currentSelectedTag: restoreTag);
+      }
       final linkProbe = await _runLinkProbe(
         ref,
         groupTag: groupTag,

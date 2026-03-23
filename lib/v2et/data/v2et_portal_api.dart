@@ -214,11 +214,20 @@ class V2etPortalApi {
   Future<Map<String, dynamic>> _authGet(V2boardSession session, String path) async {
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
+    final referer = session.baseUrl.replace(path: '/').toString();
     for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
         final response = await _dio.getUri<Object?>(
           uri,
-          options: Options(headers: {'Accept': 'application/json', 'Authorization': auth}),
+          options: Options(
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': auth,
+              'X-Requested-With': 'XMLHttpRequest',
+              'Referer': referer,
+              'Origin': '${session.baseUrl.scheme}://${session.baseUrl.host}',
+            },
+          ),
         );
         return _readMap(response.data);
       } on DioException catch (e) {
@@ -235,22 +244,45 @@ class V2etPortalApi {
   }) async {
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
+    final referer = session.baseUrl.replace(path: '/').toString();
     for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
       try {
         final response = await _dio.postUri<Object?>(
           uri,
-          data: data,
+          data: FormData.fromMap(data),
           options: Options(
             headers: {
               'Accept': 'application/json',
               'Authorization': auth,
               'Content-Type': 'application/x-www-form-urlencoded',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Referer': referer,
+              'Origin': '${session.baseUrl.scheme}://${session.baseUrl.host}',
             },
           ),
         );
         return _readMap(response.data);
       } on DioException catch (e) {
         last = e;
+        try {
+          final response = await _dio.postUri<Object?>(
+            uri,
+            data: data,
+            options: Options(
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': auth,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': referer,
+                'Origin': '${session.baseUrl.scheme}://${session.baseUrl.host}',
+              },
+            ),
+          );
+          return _readMap(response.data);
+        } on DioException catch (e2) {
+          last = e2;
+        }
       }
     }
     throw last ?? StateError('Portal request failed.');

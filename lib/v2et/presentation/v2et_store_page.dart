@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -315,6 +316,17 @@ class _OfferCard extends ConsumerWidget {
                 } catch (e) {
                   setState(() => couponValid = false);
                   if (ctx.mounted) {
+                    if (e is DioException && e.response?.statusCode == 403) {
+                      showV2etNotice(
+                        ctx,
+                        tr(
+                          '优惠码验证被面板拒绝(403)，请检查面板优惠码权限设置',
+                          'Coupon check rejected with 403. Please check panel coupon permissions.',
+                        ),
+                        error: true,
+                      );
+                      return;
+                    }
                     showV2etNotice(ctx, tr('优惠码验证失败: ', 'Coupon check failed: ') + e.toString(), error: true);
                   }
                 } finally {
@@ -574,6 +586,17 @@ class _OfferCard extends ConsumerWidget {
       await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);
     } catch (e) {
       if (!context.mounted) return;
+      if (e is DioException && e.response?.statusCode == 403) {
+        showV2etNotice(
+          context,
+          tr(
+            '下单被面板拒绝(403)，请检查套餐购买权限、支付方式或站点风控设置',
+            'Order rejected with 403. Check plan permission, payment method, or panel security settings.',
+          ),
+          error: true,
+        );
+        return;
+      }
       showV2etNotice(context, tr('下单失败: ', 'Checkout failed: ') + e.toString(), error: true);
     }
   }

@@ -720,36 +720,33 @@ class V2etDashboardPage extends HookConsumerWidget {
     final restoreTag = _readSelectedTag(currentGroup);
 
     if (item.isSpecial) {
-      if (connected) {
-        final linkProbe = await _runLinkProbe(
-          ref,
-          groupTag: groupTag,
-          outboundTag: item.selectTag,
-          restoreTag: restoreTag,
-        );
-        if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
-          return linkProbe;
-        }
+      final linkProbe = await _runLinkProbe(
+        ref,
+        groupTag: groupTag,
+        outboundTag: item.selectTag,
+        restoreTag: restoreTag,
+        timeout: connected ? const Duration(seconds: 8) : const Duration(seconds: 15),
+      );
+      if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
+        return linkProbe;
       }
       return _runSpecialModeProbe(item, nodeTargets, currentSelectedTag: restoreTag);
     }
 
     final directTarget = nodeTargets[item.testTag];
 
-    if (connected) {
-      final probeTimeout = (directTarget != null && !directTarget.tcpProbeAllowed)
-          ? const Duration(seconds: 15)
-          : const Duration(seconds: 8);
-      final linkProbe = await _runLinkProbe(
-        ref,
-        groupTag: groupTag,
-        outboundTag: item.selectTag,
-        restoreTag: restoreTag,
-        timeout: probeTimeout,
-      );
-      if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
-        return linkProbe;
-      }
+    final probeTimeout = (directTarget != null && !directTarget.tcpProbeAllowed)
+        ? const Duration(seconds: 15)
+        : const Duration(seconds: 8);
+    final linkProbe = await _runLinkProbe(
+      ref,
+      groupTag: groupTag,
+      outboundTag: item.selectTag,
+      restoreTag: restoreTag,
+      timeout: probeTimeout,
+    );
+    if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
+      return linkProbe;
     }
 
     if (directTarget != null && directTarget.tcpProbeAllowed) {
@@ -777,7 +774,10 @@ class V2etDashboardPage extends HookConsumerWidget {
       }
     }
 
-    final candidates = nodeTargets.entries.toList();
+    final candidates = nodeTargets.entries.where((e) => e.value.tcpProbeAllowed).toList();
+    if (candidates.isEmpty) {
+      return 65535;
+    }
     final cap = min(8, candidates.length);
     final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 2500)));
     final results = await Future.wait(checks);

@@ -247,15 +247,6 @@ class _OfferCard extends ConsumerWidget {
       }
       lines.add('✓ $raw');
     }
-    if (offer.traffic != null && offer.traffic! > 0) {
-      lines.add(tr('流量: ', 'Traffic: ') + _humanBytes(offer.traffic!));
-    }
-    if (offer.speed != null && offer.speed!.trim().isNotEmpty) {
-      lines.add(tr('速率: ', 'Speed: ') + offer.speed!.trim());
-    }
-    if (offer.deviceLimit != null) {
-      lines.add(tr('设备限制: ', 'Device limit: ') + '${offer.deviceLimit}${tr('台', '')}');
-    }
     if (lines.isEmpty) {
       return tr('高速稳定网络服务，适配多终端场景。', 'Fast and stable network service for multi-device usage.');
     }
@@ -346,23 +337,15 @@ class _OfferCard extends ConsumerWidget {
                 }
               }
               if (featureLines.isEmpty) {
-                if (offer.traffic != null && offer.traffic! > 0) {
-                  featureLines.add((true, tr('每月流量 ', 'Monthly traffic ') + _humanBytes(offer.traffic!)));
-                }
-                if (offer.speed != null && offer.speed!.trim().isNotEmpty) {
-                  featureLines.add((true, tr('速率 ', 'Speed ') + offer.speed!.trim()));
-                }
-                if (offer.deviceLimit != null) {
-                  featureLines.add((true, tr('设备限制 ', 'Device limit ') + '${offer.deviceLimit}${tr('台', '')}'));
-                }
+                featureLines.add((true, tr('以官网套餐说明为准', 'Follow plan description from panel')));
               }
 
               return AlertDialog(
-                titlePadding: const EdgeInsets.fromLTRB(20, 16, 10, 6),
+                titlePadding: const EdgeInsets.fromLTRB(18, 14, 8, 4),
                 title: Row(
                   children: [
                     Expanded(
-                      child: Text(offer.name, style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900)),
+                      child: Text(offer.name, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(dialogContext).pop(),
@@ -370,9 +353,9 @@ class _OfferCard extends ConsumerWidget {
                     ),
                   ],
                 ),
-                contentPadding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+                contentPadding: const EdgeInsets.fromLTRB(18, 6, 18, 8),
                 content: SizedBox(
-                  width: 840,
+                  width: 640,
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,33 +499,26 @@ class _OfferCard extends ConsumerWidget {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(46),
-                              backgroundColor: const Color(0xFF1F79D8),
-                            ),
-                            onPressed: () {
-                              Navigator.of(dialogContext).pop(
-                                _PurchaseInput(
-                                  period: selectedPeriod,
-                                  paymentMethod: selectedMethod,
-                                  couponCode: couponController.text.trim(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.check_circle_outline_rounded),
-                            label: Text(tr('确定购买', 'Place order')),
-                          ),
-                        ),
+                        const SizedBox(height: 6),
                       ],
                     ),
                   ),
                 ),
                 actions: [
                   TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('取消', 'Cancel'))),
+                  FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: const Size(124, 40)),
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop(
+                        _PurchaseInput(
+                          period: selectedPeriod,
+                          paymentMethod: selectedMethod,
+                          couponCode: couponController.text.trim(),
+                        ),
+                      );
+                    },
+                    child: Text(tr('确认购买', 'Confirm order')),
+                  ),
                 ],
               );
             },

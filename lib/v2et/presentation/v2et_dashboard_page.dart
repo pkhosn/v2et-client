@@ -524,9 +524,6 @@ class V2etDashboardPage extends HookConsumerWidget {
         String? host = item['server']?.toString().trim();
         int? port = _parsePort(item['server_port']) ?? _parsePort(item['port']);
         final peer = item['peer']?.toString().trim();
-        if ((host == null || host.isEmpty) && peer != null && peer.isNotEmpty) {
-          host = peer;
-        }
         host ??= item['address']?.toString().trim();
         if ((host == null || host.isEmpty) && item['server'] != null) {
           final serverText = item['server'].toString().trim();
@@ -537,14 +534,30 @@ class V2etDashboardPage extends HookConsumerWidget {
           }
         }
         if ((host == null || host.isEmpty) && peer != null && peer.isNotEmpty) {
-          final idx = peer.lastIndexOf(':');
-          if (idx > 0 && idx < peer.length - 1) {
-            host = peer.substring(0, idx);
-            port ??= _parsePort(peer.substring(idx + 1));
+          final peerText = peer.trim();
+          final ipv6 = RegExp(r'^\[(.*)\]:(\d+)$').firstMatch(peerText);
+          if (ipv6 != null) {
+            host = ipv6.group(1);
+            port ??= _parsePort(ipv6.group(2));
+          } else {
+            final idx = peerText.lastIndexOf(':');
+            if (idx > 0 && idx < peerText.length - 1) {
+              host = peerText.substring(0, idx);
+              port ??= _parsePort(peerText.substring(idx + 1));
+            } else {
+              host = peerText;
+            }
+          }
+        }
+        if (host != null && host.contains(':') && !host.contains(']') && port == null) {
+          final idx = host.lastIndexOf(':');
+          if (idx > 0 && idx < host.length - 1) {
+            port = _parsePort(host.substring(idx + 1));
+            host = host.substring(0, idx);
           }
         }
         if (host != null && host.isNotEmpty && port != null && port > 0 && port <= 65535) {
-          targets[tag] = _NodeTarget(host: host, port: port);
+          targets[tag] = _NodeTarget(host: host, port: port, protocol: type);
         }
       }
       return _NodeMeta(tags: tags.toSet().toList(), targets: targets);
@@ -565,6 +578,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     required String groupTag,
     required String outboundTag,
     required String? restoreTag,
+    Duration timeout = const Duration(seconds: 8),
   }) async {
     final repo = ref.read(proxyRepositoryProvider);
     final selected = await repo.selectProxy(groupTag, outboundTag).run();
@@ -575,7 +589,7 @@ class V2etDashboardPage extends HookConsumerWidget {
 
     final timer = Stopwatch()..start();
     try {
-      final res = await repo.getCurrentIpInfo(CancelToken()).run().timeout(const Duration(seconds: 4));
+      final res = await repo.getCurrentIpInfo(CancelToken()).run().timeout(timeout);
       final ms = res.match((_) => 65535, (_) => timer.elapsedMilliseconds);
       return ms > 0 ? ms : 65535;
     } catch (_) {
@@ -681,7 +695,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  Future<int?> _runTcpProbe(_NodeTarget target, {Duration timeout = const Duration(milliseconds: 2200)}) async {
+  Future<int?> _runTcpProbe(_NodeTarget target, {Duration timeout = const Duration(milliseconds: 4500)}) async {
     final watch = Stopwatch()..start();
     Socket? socket;
     try {
@@ -705,24 +719,40 @@ class V2etDashboardPage extends HookConsumerWidget {
     final groupTag = _readGroupTag(currentGroup) ?? 'select';
     final restoreTag = _readSelectedTag(currentGroup);
 
+    if (item.isSpecial) {
+      if (connected) {
+        final linkProbe = await _runLinkProbe(
+          ref,
+          groupTag: groupTag,
+          outboundTag: item.selectTag,
+          restoreTag: restoreTag,
+        );
+        if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
+          return linkProbe;
+        }
+      }
+      return _runSpecialModeProbe(item, nodeTargets, currentSelectedTag: restoreTag);
+    }
+
+    final directTarget = nodeTargets[item.testTag];
+
     if (connected) {
+      final probeTimeout = (directTarget != null && !directTarget.tcpProbeAllowed)
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 8);
       final linkProbe = await _runLinkProbe(
         ref,
         groupTag: groupTag,
         outboundTag: item.selectTag,
         restoreTag: restoreTag,
+        timeout: probeTimeout,
       );
       if (linkProbe != null && linkProbe > 0 && linkProbe < 65535) {
         return linkProbe;
       }
     }
 
-    if (item.isSpecial) {
-      return _runSpecialModeProbe(item, nodeTargets, currentSelectedTag: restoreTag);
-    }
-
-    final directTarget = nodeTargets[item.testTag];
-    if (directTarget != null) {
+    if (directTarget != null && directTarget.tcpProbeAllowed) {
       return _runTcpProbe(directTarget);
     }
     return 65535;
@@ -749,7 +779,7 @@ class V2etDashboardPage extends HookConsumerWidget {
 
     final candidates = nodeTargets.entries.toList();
     final cap = min(8, candidates.length);
-    final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 1800)));
+    final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 2500)));
     final results = await Future.wait(checks);
     final good = results.whereType<int>().where((ms) => ms > 0 && ms < 65535).toList();
     if (good.isEmpty) {
@@ -951,10 +981,15 @@ class _NodeEntry {
 }
 
 class _NodeTarget {
-  const _NodeTarget({required this.host, required this.port});
+  const _NodeTarget({required this.host, required this.port, required this.protocol});
 
   final String host;
   final int port;
+  final String protocol;
+
+  bool get tcpProbeAllowed {
+    return protocol != 'tuic' && protocol != 'hysteria' && protocol != 'hysteria2';
+  }
 }
 
 class _NodeMeta {

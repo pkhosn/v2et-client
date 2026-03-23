@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
@@ -577,21 +579,6 @@ class _OfferCard extends ConsumerWidget {
         return;
       }
 
-      final paymentUri = _resolvePaymentUri(checkout.data);
-      if (paymentUri != null) {
-        var opened = await launchUrl(paymentUri, mode: LaunchMode.inAppWebView);
-        if (!opened) {
-          await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
-        }
-        if (context.mounted) {
-          showV2etNotice(
-            context,
-            tr('已打开支付页面，支付完成后请返回客户端查看订单状态', 'Payment page opened. Return to app after payment to check order status.'),
-          );
-        }
-        return;
-      }
-
       await _showPaymentDialog(context: context, ref: ref, session: session, tradeNo: tradeNo, checkout: checkout);
     } catch (e) {
       if (!context.mounted) return;
@@ -639,6 +626,9 @@ class _OfferCard extends ConsumerWidget {
     final isHtml = raw.startsWith('<');
     final paymentUri = _resolvePaymentUri(raw);
     final qrPayload = isHtml ? null : raw;
+    var paymentWindowOpened = false;
+    var paymentWindowOpening = false;
+    String? paymentWindowHint;
 
     await showDialog<void>(
       context: context,
@@ -675,6 +665,36 @@ class _OfferCard extends ConsumerWidget {
               }
             }
 
+            Future<void> openPaymentWindow() async {
+              if (paymentUri == null || paymentWindowOpening) return;
+              setState(() {
+                paymentWindowOpening = true;
+                paymentWindowHint = null;
+              });
+              try {
+                final opened = await _openPaymentWindow(paymentUri);
+                setState(() {
+                  paymentWindowOpened = opened;
+                  paymentWindowHint = opened
+                      ? tr('支付窗口已打开，请在弹出的窗口完成付款', 'Payment window opened. Complete payment in the opened window.')
+                      : tr('无法打开内置支付窗口，请使用浏览器备用', 'Failed to open embedded payment window. Use browser fallback.');
+                });
+              } catch (e) {
+                setState(() {
+                  paymentWindowOpened = false;
+                  paymentWindowHint = tr('打开支付窗口失败: ', 'Failed to open payment window: ') + e.toString();
+                });
+              } finally {
+                if (dialogContext.mounted) {
+                  setState(() => paymentWindowOpening = false);
+                }
+              }
+            }
+
+            if (paymentUri != null && !paymentWindowOpened && !paymentWindowOpening) {
+              Future<void>.microtask(openPaymentWindow);
+            }
+
             return AlertDialog(
               title: Text(tr('完成支付', 'Complete payment')),
               content: SizedBox(
@@ -693,7 +713,7 @@ class _OfferCard extends ConsumerWidget {
                         ),
                       )
                     else if (paymentUri != null) ...[
-                      Text(tr('请扫码或打开链接完成付款', 'Scan QR code or open link to pay')),
+                      Text(tr('请在弹出的支付窗口内完成付款', 'Please complete payment in the opened payment window')),
                       const SizedBox(height: 10),
                       Center(
                         child: Image.network(
@@ -703,6 +723,17 @@ class _OfferCard extends ConsumerWidget {
                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                         ),
                       ),
+                      if (paymentWindowHint != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          paymentWindowHint!,
+                          style: TextStyle(
+                            color: paymentWindowOpened ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ] else
                       Text(tr('支付数据无效，请网页支付', 'Invalid payment payload, please pay in web browser')),
                   ],
@@ -721,6 +752,13 @@ class _OfferCard extends ConsumerWidget {
                   ),
                 if (paymentUri != null)
                   FilledButton.tonal(
+                    onPressed: paymentWindowOpening ? null : openPaymentWindow,
+                    child: Text(
+                      paymentWindowOpening ? tr('打开中...', 'Opening...') : tr('重新打开支付窗口', 'Reopen payment window'),
+                    ),
+                  ),
+                if (paymentUri != null)
+                  TextButton(
                     onPressed: () async {
                       await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
                     },
@@ -736,6 +774,31 @@ class _OfferCard extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<bool> _openPaymentWindow(Uri uri) async {
+    final url = uri.toString();
+    if (url.isEmpty) return false;
+
+    final isDesktop =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
+    if (isDesktop) {
+      final available = await WebviewWindow.isWebviewAvailable();
+      if (available) {
+        final webview = await WebviewWindow.create(
+          configuration: CreateConfiguration(title: tr('支付窗口', 'Payment Window'), titleBarTopPadding: 8),
+        );
+        webview.launch(url);
+        return true;
+      }
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
+    if (opened) return true;
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   String _periodField(String key) {

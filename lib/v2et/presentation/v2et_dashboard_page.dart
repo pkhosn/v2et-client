@@ -586,8 +586,13 @@ class V2etDashboardPage extends HookConsumerWidget {
     Duration timeout = const Duration(seconds: 8),
   }) async {
     final repo = ref.read(proxyRepositoryProvider);
-    final selected = await repo.selectProxy(groupTag, outboundTag).run();
-    final canProbe = selected.match((_) => false, (_) => true);
+    bool canProbe = false;
+    try {
+      final selected = await repo.selectProxy(groupTag, outboundTag).run().timeout(const Duration(seconds: 4));
+      canProbe = selected.match((_) => false, (_) => true);
+    } catch (_) {
+      canProbe = false;
+    }
     if (!canProbe) {
       return 65535;
     }
@@ -602,7 +607,9 @@ class V2etDashboardPage extends HookConsumerWidget {
     } finally {
       timer.stop();
       if (restoreTag != null && restoreTag.isNotEmpty && restoreTag != outboundTag) {
-        await repo.selectProxy(groupTag, restoreTag).run();
+        try {
+          await repo.selectProxy(groupTag, restoreTag).run().timeout(const Duration(seconds: 3));
+        } catch (_) {}
       }
     }
   }
@@ -704,7 +711,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final watch = Stopwatch()..start();
     Socket? socket;
     try {
-      socket = await Socket.connect(target.host, target.port, timeout: timeout);
+      socket = await Socket.connect(target.host, target.port, timeout: timeout).timeout(timeout);
       return watch.elapsedMilliseconds;
     } catch (_) {
       return 65535;
@@ -750,7 +757,7 @@ class V2etDashboardPage extends HookConsumerWidget {
       if (directTarget.tcpProbeAllowed) {
         return _runTcpProbe(directTarget, timeout: const Duration(milliseconds: 2200));
       }
-      return -2;
+      return _runTcpProbe(directTarget, timeout: const Duration(milliseconds: 1800));
     }
 
     final probeTimeout = (directTarget != null && !directTarget.tcpProbeAllowed)
@@ -778,9 +785,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     Map<String, _NodeTarget> nodeTargets, {
     String? currentSelectedTag,
   }) async {
-    if (nodeTargets.isEmpty) {
-      return 65535;
-    }
+    if (nodeTargets.isEmpty) return 65535;
 
     if (item.id == '__failover__' && currentSelectedTag != null && currentSelectedTag.isNotEmpty) {
       final currentTarget = nodeTargets[currentSelectedTag];
@@ -792,13 +797,16 @@ class V2etDashboardPage extends HookConsumerWidget {
       }
     }
 
-    final candidates = nodeTargets.entries.where((e) => e.value.tcpProbeAllowed).toList();
-    if (candidates.isEmpty) {
-      return -2;
+    final candidates = nodeTargets.entries.toList();
+    if (candidates.isEmpty) return 65535;
+    final cap = min(6, candidates.length);
+    final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 1800)));
+    List<int?> results;
+    try {
+      results = await Future.wait(checks).timeout(const Duration(seconds: 5));
+    } catch (_) {
+      return 65535;
     }
-    final cap = min(8, candidates.length);
-    final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 2500)));
-    final results = await Future.wait(checks);
     final good = results.whereType<int>().where((ms) => ms > 0 && ms < 65535).toList();
     if (good.isEmpty) {
       return 65535;
@@ -1083,6 +1091,7 @@ class _ConnectionHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = compact ? 340.0 : 620.0;
     final height = compact ? 190.0 : 240.0;
+    final mapScale = compact ? 3.6 : 4.0;
     return SizedBox(
       width: width,
       height: height,
@@ -1095,11 +1104,14 @@ class _ConnectionHero extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 8),
                 child: Opacity(
                   opacity: 0.38,
-                  child: Image.asset(
-                    'assets/images/world_map.png',
-                    fit: BoxFit.contain,
-                    alignment: Alignment.center,
-                    filterQuality: FilterQuality.medium,
+                  child: Transform.scale(
+                    scale: mapScale,
+                    child: Image.asset(
+                      'assets/images/world_map.png',
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.medium,
+                    ),
                   ),
                 ),
               ),

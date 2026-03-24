@@ -167,20 +167,85 @@ class V2etPortalApi {
     required String periodField,
     String? couponCode,
   }) async {
-    final save = await _authPost(
-      session,
-      '/api/v1/user/order/save',
-      data: {
-        'plan_id': planId,
-        'period': periodField,
-        if (couponCode != null && couponCode.trim().isNotEmpty) 'coupon_code': couponCode.trim(),
-      },
-    );
+    Map<String, dynamic> save;
+    try {
+      save = await _authPost(
+        session,
+        '/api/v1/user/order/save',
+        data: {
+          'plan_id': planId,
+          'period': periodField,
+          if (couponCode != null && couponCode.trim().isNotEmpty) 'coupon_code': couponCode.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      final message = _extractApiError(e.response?.data) ?? _readString(e.message) ?? '';
+      if (_looksLikePendingOrderError(message)) {
+        final reusable = await _findPendingTradeNo(session, planId: planId);
+        if (reusable != null && reusable.isNotEmpty) {
+          return reusable;
+        }
+      }
+      rethrow;
+    }
+
     final tradeNo = _readString(_readMapNullable(save['data'])?['data'] ?? save['data']);
     if (tradeNo == null || tradeNo.isEmpty) {
+      final reusable = await _findPendingTradeNo(session, planId: planId);
+      if (reusable != null && reusable.isNotEmpty) {
+        return reusable;
+      }
       throw StateError('Failed to create order');
     }
     return tradeNo;
+  }
+
+  bool _looksLikePendingOrderError(String raw) {
+    final message = raw.trim().toLowerCase();
+    if (message.isEmpty) return false;
+    return message.contains('pending') ||
+        message.contains('unpaid') ||
+        message.contains('not paid') ||
+        message.contains('exists') ||
+        message.contains('待支付') ||
+        message.contains('未支付') ||
+        message.contains('请先支付') ||
+        message.contains('已存在订单');
+  }
+
+  Future<String?> _findPendingTradeNo(V2boardSession session, {required int planId}) async {
+    try {
+      final json = await _authGet(session, '/api/v1/user/order/fetch');
+      final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
+      String? latestTradeNo;
+      int latestCreatedAt = -1;
+      for (final row in rows) {
+        final tradeNo = _readString(row['trade_no']);
+        if (tradeNo == null || tradeNo.isEmpty) continue;
+
+        final rowPlanId = _readInt(row['plan_id']) ?? _readInt(_readMapNullable(row['plan'])?['id']);
+        if (rowPlanId != null && rowPlanId != planId) continue;
+
+        final statusCode = _readInt(row['status']);
+        final statusText = _readString(row['status_name'])?.toLowerCase() ?? '';
+        final pending =
+            statusCode == 0 ||
+            statusText.contains('pending') ||
+            statusText.contains('unpaid') ||
+            statusText.contains('待支付') ||
+            statusText.contains('未支付');
+        if (!pending) continue;
+
+        final createdAt = _readInt(row['created_at']) ?? 0;
+        if (createdAt > latestCreatedAt) {
+          latestCreatedAt = createdAt;
+          latestTradeNo = tradeNo;
+        }
+      }
+      return latestTradeNo;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<V2etCheckoutResult> checkoutOrder({
@@ -220,7 +285,8 @@ class V2etPortalApi {
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
     final referer = session.baseUrl.replace(path: '/').toString();
-    for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
+    final origin = _originOf(session.baseUrl);
+    for (final auth in _authCandidates(session.accessToken)) {
       try {
         final response = await _dio.getUri<Object?>(
           uri,
@@ -230,7 +296,7 @@ class V2etPortalApi {
               'Authorization': auth,
               'X-Requested-With': 'XMLHttpRequest',
               'Referer': referer,
-              'Origin': '${session.baseUrl.scheme}://${session.baseUrl.host}',
+              'Origin': origin,
             },
           ),
         );
@@ -250,19 +316,23 @@ class V2etPortalApi {
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
     final referer = session.baseUrl.replace(path: '/').toString();
-    for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
+    final origin = _originOf(session.baseUrl);
+    final encoded = data.entries
+        .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value?.toString() ?? '')}')
+        .join('&');
+    for (final auth in _authCandidates(session.accessToken)) {
       try {
         final response = await _dio.postUri<Object?>(
           uri,
-          data: FormData.fromMap(data),
+          data: data,
           options: Options(
+            contentType: Headers.formUrlEncodedContentType,
             headers: {
               'Accept': 'application/json',
               'Authorization': auth,
-              'Content-Type': 'application/x-www-form-urlencoded',
               'X-Requested-With': 'XMLHttpRequest',
               'Referer': referer,
-              'Origin': '${session.baseUrl.scheme}://${session.baseUrl.host}',
+              'Origin': origin,
             },
           ),
         );
@@ -272,25 +342,71 @@ class V2etPortalApi {
         try {
           final response = await _dio.postUri<Object?>(
             uri,
-            data: data,
+            data: encoded,
             options: Options(
+              contentType: Headers.formUrlEncodedContentType,
               headers: {
                 'Accept': 'application/json',
                 'Authorization': auth,
-                'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'XMLHttpRequest',
                 'Referer': referer,
-                'Origin': '${session.baseUrl.scheme}://${session.baseUrl.host}',
+                'Origin': origin,
               },
             ),
           );
           return _readMap(response.data);
         } on DioException catch (e2) {
           last = e2;
+          try {
+            final response = await _dio.postUri<Object?>(
+              uri,
+              data: data,
+              options: Options(
+                contentType: Headers.jsonContentType,
+                headers: {
+                  'Accept': 'application/json',
+                  'Authorization': auth,
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'Referer': referer,
+                  'Origin': origin,
+                },
+              ),
+            );
+            return _readMap(response.data);
+          } on DioException catch (e3) {
+            last = e3;
+          }
         }
       }
     }
     throw last ?? StateError('Portal request failed.');
+  }
+
+  List<String> _authCandidates(String rawToken) {
+    final raw = rawToken.trim();
+    if (raw.isEmpty) {
+      return const [];
+    }
+    final stripped = raw.toLowerCase().startsWith('bearer ') ? raw.substring(7).trim() : raw;
+    final candidates = <String>[raw, stripped, 'Bearer $stripped'];
+    final result = <String>[];
+    for (final item in candidates) {
+      final token = item.trim();
+      if (token.isEmpty) continue;
+      if (!result.contains(token)) result.add(token);
+    }
+    return result;
+  }
+
+  String _originOf(Uri base) {
+    final host = base.host;
+    if (host.isEmpty) return '${base.scheme}://';
+    final hasCustomPort =
+        base.hasPort && !((base.scheme == 'https' && base.port == 443) || (base.scheme == 'http' && base.port == 80));
+    if (!hasCustomPort) {
+      return '${base.scheme}://$host';
+    }
+    return '${base.scheme}://$host:${base.port}';
   }
 
   Map<String, dynamic> _readMap(Object? value) {

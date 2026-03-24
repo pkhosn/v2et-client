@@ -1,9 +1,12 @@
+import 'dart:math';
+
 import 'package:dio/dio.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
@@ -168,6 +171,11 @@ class _OfferCard extends ConsumerWidget {
                       );
                       if (input == null || !context.mounted) return;
 
+                      final refreshed = await ref.read(v2etRepositoryProvider).restoreSession();
+                      if (refreshed != null && refreshed.hasToken) {
+                        session = refreshed;
+                      }
+
                       await _startCheckout(
                         context: context,
                         ref: ref,
@@ -268,6 +276,14 @@ class _OfferCard extends ConsumerWidget {
   }
 
   String _inlineErrorText(Object error) {
+    final lower = error.toString().toLowerCase();
+    if (lower.contains('未登录或登陆已过期') ||
+        lower.contains('未登录') ||
+        lower.contains('登录已过期') ||
+        lower.contains('login expired') ||
+        lower.contains('unauthorized')) {
+      return tr('无效优惠码或不能用于此套餐', 'Invalid coupon or not applicable for this plan');
+    }
     if (error is StateError) {
       final text = error.message.toString().trim();
       if (text.isNotEmpty) return text;
@@ -293,7 +309,8 @@ class _OfferCard extends ConsumerWidget {
     required List<(String, double)> prices,
   }) async {
     if (prices.isEmpty || offer.id == null) return null;
-    final methods = await ref.read(v2etPortalApiProvider).fetchPaymentMethods(session);
+    var currentSession = session;
+    final methods = await ref.read(v2etPortalApiProvider).fetchPaymentMethods(currentSession);
     if (!context.mounted) return null;
     if (methods.isEmpty) {
       showV2etNotice(context, tr('暂无可用支付方式', 'No payment method available'), error: true);
@@ -326,9 +343,13 @@ class _OfferCard extends ConsumerWidget {
                 }
                 setState(() => checkingCoupon = true);
                 try {
+                  final restored = await ref.read(v2etRepositoryProvider).restoreSession();
+                  if (restored != null && restored.hasToken) {
+                    currentSession = restored;
+                  }
                   final ok = await ref
                       .read(v2etPortalApiProvider)
-                      .checkCoupon(session: session, planId: offer.id!, couponCode: code);
+                      .checkCoupon(session: currentSession, planId: offer.id!, couponCode: code);
                   setState(() {
                     couponValid = ok;
                     couponMessage = ok
@@ -336,6 +357,24 @@ class _OfferCard extends ConsumerWidget {
                         : tr('无效优惠码或不能用于此套餐', 'Invalid coupon or not applicable for this plan');
                   });
                 } catch (e) {
+                  if (_isAuthExpiredError(e)) {
+                    try {
+                      final restored = await ref.read(v2etRepositoryProvider).restoreSession();
+                      if (restored != null && restored.hasToken) {
+                        currentSession = restored;
+                        final ok = await ref
+                            .read(v2etPortalApiProvider)
+                            .checkCoupon(session: currentSession, planId: offer.id!, couponCode: code);
+                        setState(() {
+                          couponValid = ok;
+                          couponMessage = ok
+                              ? tr('优惠码可用', 'Coupon is valid')
+                              : tr('无效优惠码或不能用于此套餐', 'Invalid coupon or not applicable for this plan');
+                        });
+                        return;
+                      }
+                    } catch (_) {}
+                  }
                   setState(() {
                     couponValid = false;
                     couponMessage = _inlineErrorText(e);
@@ -575,6 +614,7 @@ class _OfferCard extends ConsumerWidget {
 
       if (checkout.type == -1) {
         showV2etNotice(context, tr('订单已完成', 'Order completed'));
+        await _refreshAfterPayment(ref);
         ref.invalidate(v2etOrdersProvider);
         return;
       }
@@ -644,6 +684,7 @@ class _OfferCard extends ConsumerWidget {
                     .read(v2etPortalApiProvider)
                     .checkOrderStatus(session: session, tradeNo: tradeNo);
                 if (status == 3) {
+                  await _refreshAfterPayment(ref);
                   ref.invalidate(v2etOrdersProvider);
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
@@ -672,7 +713,7 @@ class _OfferCard extends ConsumerWidget {
                 paymentWindowHint = null;
               });
               try {
-                final opened = await _openPaymentWindow(paymentUri);
+                final opened = await _openPaymentWindow(innerContext, paymentUri);
                 setState(() {
                   paymentWindowOpened = opened;
                   paymentWindowHint = opened
@@ -776,7 +817,40 @@ class _OfferCard extends ConsumerWidget {
     );
   }
 
-  Future<bool> _openPaymentWindow(Uri uri) async {
+  Future<void> _refreshAfterPayment(WidgetRef ref) async {
+    try {
+      final repo = ref.read(v2etRepositoryProvider);
+      await repo.warmup();
+      final subUrl = repo.readLastSubscription()?.subscriptionUrl.toString().trim();
+      if (subUrl != null && subUrl.isNotEmpty) {
+        await ref.read(addProfileNotifierProvider.notifier).addClipboard(subUrl).catchError((_) {});
+      }
+      ref.invalidate(v2etSessionProvider);
+      ref.invalidate(v2etStoreOffersProvider);
+      ref.invalidate(v2etCountersProvider);
+      ref.invalidate(v2etTrafficLogsProvider);
+      ref.invalidate(v2etNoticesProvider);
+    } catch (_) {}
+  }
+
+  bool _isAuthExpiredError(Object error) {
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      if (status == 401 || status == 403) return true;
+      final body = error.response?.data?.toString().toLowerCase() ?? '';
+      if (body.contains('未登录') || body.contains('过期') || body.contains('login expired')) {
+        return true;
+      }
+    }
+    final text = error.toString().toLowerCase();
+    return text.contains('未登录或登陆已过期') ||
+        text.contains('未登录') ||
+        text.contains('登录已过期') ||
+        text.contains('login expired') ||
+        text.contains('unauthorized');
+  }
+
+  Future<bool> _openPaymentWindow(BuildContext context, Uri uri) async {
     final url = uri.toString();
     if (url.isEmpty) return false;
 
@@ -788,8 +862,18 @@ class _OfferCard extends ConsumerWidget {
     if (isDesktop) {
       final available = await WebviewWindow.isWebviewAvailable();
       if (available) {
+        final viewport = MediaQuery.sizeOf(context);
+        final maxWidth = viewport.width > 0 ? viewport.width : 1280;
+        final maxHeight = viewport.height > 0 ? viewport.height : 720;
+        final windowWidth = min(max((maxWidth * 0.94).round(), 320), maxWidth.round());
+        final windowHeight = min(max((maxHeight * 0.90).round(), 320), maxHeight.round());
         final webview = await WebviewWindow.create(
-          configuration: CreateConfiguration(title: tr('支付窗口', 'Payment Window'), titleBarTopPadding: 8),
+          configuration: CreateConfiguration(
+            title: tr('支付窗口', 'Payment Window'),
+            titleBarTopPadding: 8,
+            windowWidth: windowWidth,
+            windowHeight: windowHeight,
+          ),
         );
         webview.launch(url);
         return true;

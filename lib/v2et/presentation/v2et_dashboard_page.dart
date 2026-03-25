@@ -721,6 +721,32 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
+  Future<int?> _runDnsProbe(_NodeTarget target, {Duration timeout = const Duration(milliseconds: 1500)}) async {
+    final watch = Stopwatch()..start();
+    try {
+      await InternetAddress.lookup(target.host).timeout(timeout);
+      final ms = watch.elapsedMilliseconds;
+      return ms > 0 ? ms : 1;
+    } catch (_) {
+      return 65535;
+    } finally {
+      watch.stop();
+    }
+  }
+
+  Future<int?> _runOfflineTargetProbe(_NodeTarget target) {
+    if (target.protocol == 'tuic') {
+      return _runDnsProbe(target, timeout: const Duration(milliseconds: 1400));
+    }
+    if (target.protocol == 'hysteria' || target.protocol == 'hysteria2') {
+      return _runTcpProbe(target, timeout: const Duration(milliseconds: 1800));
+    }
+    if (target.tcpProbeAllowed) {
+      return _runTcpProbe(target, timeout: const Duration(milliseconds: 2200));
+    }
+    return _runTcpProbe(target, timeout: const Duration(milliseconds: 1800));
+  }
+
   Future<int?> _runLightningProbe(
     WidgetRef ref, {
     required _NodeEntry item,
@@ -754,10 +780,7 @@ class V2etDashboardPage extends HookConsumerWidget {
       if (directTarget == null) {
         return 65535;
       }
-      if (directTarget.tcpProbeAllowed) {
-        return _runTcpProbe(directTarget, timeout: const Duration(milliseconds: 2200));
-      }
-      return _runTcpProbe(directTarget, timeout: const Duration(milliseconds: 1800));
+      return _runOfflineTargetProbe(directTarget);
     }
 
     final probeTimeout = (directTarget != null && !directTarget.tcpProbeAllowed)
@@ -800,7 +823,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final candidates = nodeTargets.entries.toList();
     if (candidates.isEmpty) return 65535;
     final cap = min(6, candidates.length);
-    final checks = candidates.take(cap).map((e) => _runTcpProbe(e.value, timeout: const Duration(milliseconds: 1800)));
+    final checks = candidates.take(cap).map((e) => _runOfflineTargetProbe(e.value));
     List<int?> results;
     try {
       results = await Future.wait(checks).timeout(const Duration(seconds: 5));
@@ -1091,7 +1114,7 @@ class _ConnectionHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = compact ? 340.0 : 620.0;
     final height = compact ? 190.0 : 240.0;
-    final mapScale = compact ? 3.6 : 4.0;
+    final mapScale = compact ? 1.8 : 2.0;
     return SizedBox(
       width: width,
       height: height,

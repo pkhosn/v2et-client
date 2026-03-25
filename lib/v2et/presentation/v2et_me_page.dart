@@ -12,6 +12,7 @@ import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
 
 class V2etMePage extends HookConsumerWidget {
   const V2etMePage({super.key});
@@ -554,6 +555,33 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
 
   String tr(String a, String b) => widget.zh ? a : b;
 
+  String _apiErrorText(Object error) {
+    if (error is StateError) {
+      final text = error.message.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map) {
+        final candidates = [
+          data['message'],
+          data['msg'],
+          data['error'],
+          (data['data'] is Map) ? (data['data'] as Map)['message'] : null,
+          (data['data'] is Map) ? (data['data'] as Map)['msg'] : null,
+          (data['data'] is Map) ? (data['data'] as Map)['error'] : null,
+        ];
+        for (final c in candidates) {
+          if (c is String && c.trim().isNotEmpty) return c.trim();
+        }
+      }
+      final msg = error.message?.trim();
+      if (msg != null && msg.isNotEmpty) return msg;
+    }
+    final raw = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '').trim();
+    return raw.isEmpty ? tr('兑换失败，请稍后重试', 'Redeem failed, please retry later') : raw;
+  }
+
   @override
   void dispose() {
     codeController.dispose();
@@ -571,6 +599,20 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
       'onetime' => 'onetime_price',
       'reset' => 'reset_price',
       _ => 'month_price',
+    };
+  }
+
+  String _periodLabel(String key) {
+    return switch (key) {
+      'month' => tr('月付', 'Month'),
+      'quarter' => tr('季付', 'Quarter'),
+      'half_year' => tr('半年', 'Half-year'),
+      'year' => tr('年付', 'Year'),
+      'two_year' => tr('两年', '2-year'),
+      'three_year' => tr('三年', '3-year'),
+      'onetime' => tr('一次性', 'One-time'),
+      'reset' => tr('重置包', 'Reset'),
+      _ => tr('周期', 'Period'),
     };
   }
 
@@ -618,7 +660,7 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
               value: selectedPeriod,
               decoration: InputDecoration(labelText: tr('购买周期', 'Billing period')),
               items: (selectedPlan?.prices.keys.toList() ?? const <String>[])
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .map((p) => DropdownMenuItem(value: p, child: Text(_periodLabel(p))))
                   .toList(),
               onChanged: (v) => setState(() => selectedPeriod = v),
             ),
@@ -645,16 +687,16 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
                   final p = selectedPlan;
                   final period = selectedPeriod;
                   final code = codeController.text.trim();
-                  if (s == null || p?.id == null || period == null || code.isEmpty) return;
+                  if (s == null || code.isEmpty) return;
                   setState(() => submitting = true);
                   try {
                     final ok = await ref
                         .read(v2etPortalApiProvider)
-                        .redeemCouponPlan(
+                        .redeemGiftCard(
                           session: s,
-                          planId: p!.id!,
-                          periodField: _periodField(period),
-                          couponCode: code,
+                          code: code,
+                          planId: p?.id,
+                          periodField: period == null ? null : _periodField(period),
                         );
                     if (!mounted) return;
                     if (ok) {
@@ -665,7 +707,7 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
                     }
                   } catch (e) {
                     if (!mounted) return;
-                    showV2etNotice(context, tr('兑换失败: ', 'Redeem failed: ') + e.toString(), error: true);
+                    showV2etNotice(context, _apiErrorText(e), error: true);
                   } finally {
                     if (mounted) setState(() => submitting = false);
                   }

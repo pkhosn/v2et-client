@@ -674,6 +674,7 @@ class _OfferCard extends ConsumerWidget {
       context: context,
       builder: (dialogContext) {
         var checking = false;
+        var cancelling = false;
         return StatefulBuilder(
           builder: (innerContext, setState) {
             Future<void> checkPaid() async {
@@ -732,6 +733,29 @@ class _OfferCard extends ConsumerWidget {
               }
             }
 
+            Future<void> cancelPayment() async {
+              if (cancelling) return;
+              setState(() => cancelling = true);
+              try {
+                await ref.read(v2etPortalApiProvider).cancelOrder(session: session, tradeNo: tradeNo);
+                ref.invalidate(v2etOrdersProvider);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+                if (context.mounted) {
+                  showV2etNotice(context, tr('订单已取消', 'Order cancelled'));
+                }
+              } catch (e) {
+                if (innerContext.mounted) {
+                  showV2etNotice(innerContext, tr('取消订单失败: ', 'Cancel order failed: ') + e.toString(), error: true);
+                }
+              } finally {
+                if (dialogContext.mounted) {
+                  setState(() => cancelling = false);
+                }
+              }
+            }
+
             if (paymentUri != null && !paymentWindowOpened && !paymentWindowOpening) {
               Future<void>.microtask(openPaymentWindow);
             }
@@ -781,7 +805,10 @@ class _OfferCard extends ConsumerWidget {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr('稍后支付', 'Later'))),
+                TextButton(
+                  onPressed: cancelling || checking ? null : cancelPayment,
+                  child: Text(cancelling ? tr('取消中...', 'Cancelling...') : tr('取消支付', 'Cancel payment')),
+                ),
                 if (raw.isNotEmpty)
                   TextButton(
                     onPressed: () async {
@@ -865,8 +892,8 @@ class _OfferCard extends ConsumerWidget {
         final viewport = MediaQuery.sizeOf(context);
         final maxWidth = viewport.width > 0 ? viewport.width : 1280;
         final maxHeight = viewport.height > 0 ? viewport.height : 720;
-        final windowWidth = min(max((maxWidth * 0.94).round(), 320), maxWidth.round());
-        final windowHeight = min(max((maxHeight * 0.90).round(), 320), maxHeight.round());
+        final windowWidth = min(max((maxWidth * 0.98).round(), 760), maxWidth.round());
+        final windowHeight = min(max((maxHeight * 0.96).round(), 560), maxHeight.round());
         final webview = await WebviewWindow.create(
           configuration: CreateConfiguration(
             title: tr('支付窗口', 'Payment Window'),
@@ -875,7 +902,11 @@ class _OfferCard extends ConsumerWidget {
             windowHeight: windowHeight,
           ),
         );
+        webview.addScriptToExecuteOnDocumentCreated(_responsiveWebviewScript);
         webview.launch(url);
+        Future<void>.delayed(const Duration(milliseconds: 900), () {
+          webview.evaluateJavaScript(_responsiveWebviewScript).catchError((_) => null);
+        });
         return true;
       }
     }
@@ -899,6 +930,44 @@ class _OfferCard extends ConsumerWidget {
     };
   }
 }
+
+const String _responsiveWebviewScript = '''
+(function() {
+  try {
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'viewport';
+      document.head && document.head.appendChild(meta);
+    }
+    meta.content = 'width=device-width,initial-scale=1,maximum-scale=1';
+
+    var applyScale = function() {
+      var root = document.documentElement;
+      if (!root) return;
+      root.style.transformOrigin = '0 0';
+      root.style.width = '100%';
+      var contentWidth = Math.max(root.scrollWidth || 0, document.body ? document.body.scrollWidth : 0);
+      var viewportWidth = window.innerWidth || 0;
+      if (!contentWidth || !viewportWidth) return;
+      var scale = viewportWidth / contentWidth;
+      if (scale >= 1) {
+        root.style.transform = 'scale(1)';
+        root.style.height = 'auto';
+        return;
+      }
+      if (scale < 0.72) scale = 0.72;
+      root.style.transform = 'scale(' + scale + ')';
+      root.style.height = (100 / scale) + '%';
+    };
+
+    window.addEventListener('load', applyScale);
+    window.addEventListener('resize', applyScale);
+    setTimeout(applyScale, 300);
+    setTimeout(applyScale, 1000);
+  } catch (e) {}
+})();
+''';
 
 class _PurchaseInput {
   const _PurchaseInput({required this.period, required this.paymentMethod, required this.couponCode});

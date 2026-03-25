@@ -114,21 +114,176 @@ class V2etPortalApi {
     required String periodField,
     required String couponCode,
   }) async {
-    await _authPost(session, '/api/v1/user/coupon/check', data: {'code': couponCode, 'plan_id': planId});
+    try {
+      await _authPost(session, '/api/v1/user/coupon/check', data: {'code': couponCode, 'plan_id': planId});
 
-    final save = await _authPost(
-      session,
-      '/api/v1/user/order/save',
-      data: {'plan_id': planId, 'period': periodField, 'coupon_code': couponCode},
-    );
-    final tradeNo = _readString(_readMapNullable(save['data'])?['data'] ?? save['data']);
-    if (tradeNo == null || tradeNo.isEmpty) {
-      throw StateError('Failed to create coupon order');
+      final save = await _authPost(
+        session,
+        '/api/v1/user/order/save',
+        data: {'plan_id': planId, 'period': periodField, 'coupon_code': couponCode},
+      );
+      final tradeNo = _readString(_readMapNullable(save['data'])?['data'] ?? save['data']);
+      if (tradeNo == null || tradeNo.isEmpty) {
+        final message = _extractApiError(save) ?? 'Failed to create coupon order';
+        throw StateError(message);
+      }
+
+      final checkout = await _authPost(session, '/api/v1/user/order/checkout', data: {'trade_no': tradeNo});
+      final type = _readInt(_readMapNullable(checkout['data'])?['type'] ?? checkout['type']) ?? -1;
+      if (type == -1) {
+        return true;
+      }
+      final message = _extractApiError(checkout);
+      if (message != null && message.isNotEmpty) {
+        throw StateError(message);
+      }
+      return false;
+    } on DioException catch (e) {
+      final message = _extractApiError(e.response?.data) ?? _readString(e.message) ?? 'Redeem failed';
+      throw StateError(message);
+    }
+  }
+
+  Future<bool> redeemGiftCard({
+    required V2boardSession session,
+    required String code,
+    int? planId,
+    String? periodField,
+  }) async {
+    final trimmed = code.trim();
+    if (trimmed.isEmpty) {
+      throw StateError('Gift code is empty');
     }
 
-    final checkout = await _authPost(session, '/api/v1/user/order/checkout', data: {'trade_no': tradeNo});
-    final type = _readInt(_readMapNullable(checkout['data'])?['type'] ?? checkout['type']) ?? -1;
-    return type == -1;
+    final redeemAttempts = <Future<bool> Function()>[];
+
+    if (planId != null && periodField != null && periodField.trim().isNotEmpty) {
+      redeemAttempts.add(() async {
+        return redeemCouponPlan(session: session, planId: planId, periodField: periodField, couponCode: trimmed);
+      });
+    }
+
+    redeemAttempts.add(() async {
+      return _redeemGiftCardWithExtendedEndpoints(
+        session: session,
+        code: trimmed,
+        planId: planId,
+        periodField: periodField,
+      );
+    });
+
+    Object? lastError;
+    for (final attempt in redeemAttempts) {
+      try {
+        final ok = await attempt();
+        if (ok) return true;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (lastError != null) {
+      throw lastError;
+    }
+    return false;
+  }
+
+  Future<bool> _redeemGiftCardWithExtendedEndpoints({
+    required V2boardSession session,
+    required String code,
+    int? planId,
+    String? periodField,
+  }) async {
+    final payloads = <Map<String, Object?>>[
+      {
+        'code': code,
+        if (planId != null) 'plan_id': planId,
+        if (periodField != null && periodField.trim().isNotEmpty) 'period': periodField,
+      },
+      {
+        'gift_code': code,
+        if (planId != null) 'plan_id': planId,
+        if (periodField != null && periodField.trim().isNotEmpty) 'period': periodField,
+      },
+      {
+        'card_code': code,
+        if (planId != null) 'plan_id': planId,
+        if (periodField != null && periodField.trim().isNotEmpty) 'period': periodField,
+      },
+    ];
+
+    final paths = <String>[
+      '/api/v1/user/giftCard/redeem',
+      '/api/v1/user/gift_card/redeem',
+      '/api/v1/user/giftcard/redeem',
+      '/api/v1/user/card/redeem',
+      '/api/v1/user/redeem',
+    ];
+
+    Object? lastError;
+    Object? preferredBusinessError;
+    for (final path in paths) {
+      for (final payload in payloads) {
+        try {
+          final resp = await _authPost(session, path, data: payload);
+          if (_isRedeemSuccess(resp)) {
+            return true;
+          }
+          final message = _extractApiError(resp);
+          if (message != null && message.isNotEmpty) {
+            preferredBusinessError ??= StateError(message);
+          }
+        } on DioException catch (e) {
+          final message = _extractApiError(e.response?.data) ?? _readString(e.message) ?? 'Redeem request failed';
+          final mapped = StateError(message);
+          lastError = mapped;
+          final status = e.response?.statusCode ?? 0;
+          if (status != 404 && status != 405 && !_looksLikeEndpointMissing(message)) {
+            preferredBusinessError ??= mapped;
+          }
+        } catch (e) {
+          lastError = e;
+          preferredBusinessError ??= e;
+        }
+      }
+    }
+    if (preferredBusinessError != null) {
+      throw preferredBusinessError;
+    }
+    if (lastError != null) {
+      throw lastError;
+    }
+    return false;
+  }
+
+  bool _looksLikeEndpointMissing(String raw) {
+    final text = raw.toLowerCase();
+    return text.contains('not found') || text.contains('404') || text.contains('route') || text.contains('endpoint');
+  }
+
+  bool _isRedeemSuccess(Map<String, dynamic> response) {
+    final success = response['success'];
+    if (success is bool) return success;
+
+    final code = _readInt(response['code']);
+    if (code != null) {
+      if (code == 0 || code == 200) return true;
+      if (code < 0 || code > 0) return false;
+    }
+
+    final status = _readInt(response['status']) ?? _readInt(_readMapNullable(response['data'])?['status']);
+    if (status != null) {
+      if (status == 1 || status == 200 || status == 3 || status == 4) return true;
+      if (status == 0 || status == 2) return false;
+    }
+
+    final data = _readMapNullable(response['data']);
+    final dataType = _readInt(data?['type']) ?? _readInt(response['type']);
+    if (dataType != null) {
+      return dataType == -1 || dataType == 3 || dataType == 4;
+    }
+
+    return true;
   }
 
   Future<bool> checkCoupon({required V2boardSession session, required int planId, required String couponCode}) async {
@@ -279,6 +434,10 @@ class V2etPortalApi {
       }
     }
     throw last ?? StateError('Order check failed.');
+  }
+
+  Future<void> cancelOrder({required V2boardSession session, required String tradeNo}) async {
+    await _authPost(session, '/api/v1/user/order/cancel', data: {'trade_no': tradeNo});
   }
 
   Future<Map<String, dynamic>> _authGet(V2boardSession session, String path) async {

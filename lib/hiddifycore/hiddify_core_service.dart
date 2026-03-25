@@ -186,6 +186,10 @@ class HiddifyCoreService with InfraLogger {
         loggy.error("failed to start bg core: $e");
         ref.read(coreRestartSignalProvider.notifier).restart();
         if (e.code == StatusCode.unavailable) {
+          final recovered = await _recoverAndRetryStart(path, name, disableMemoryLimit);
+          if (recovered) {
+            return right(unit);
+          }
           return left(const ConnectionFailure.unexpected("background core is not started yet!"));
         }
         // throw InvalidConfig(e.message);
@@ -199,6 +203,23 @@ class HiddifyCoreService with InfraLogger {
 
       return right(unit);
     });
+  }
+
+  Future<bool> _recoverAndRetryStart(String path, String name, bool disableMemoryLimit) async {
+    try {
+      final setupRes = await setup().run();
+      if (setupRes.isLeft()) return false;
+      final res = await core.bgClient.start(
+        StartRequest(configPath: path, configName: name, disableMemoryLimit: disableMemoryLimit),
+      );
+      if (res.messageType == MessageType.ALREADY_STARTED || res.messageType == MessageType.EMPTY) {
+        ref.read(coreRestartSignalProvider.notifier).restart();
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   TaskEither<String, Unit> stop() {

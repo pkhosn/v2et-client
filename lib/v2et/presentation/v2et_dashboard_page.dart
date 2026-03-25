@@ -721,22 +721,9 @@ class V2etDashboardPage extends HookConsumerWidget {
     }
   }
 
-  Future<int?> _runDnsProbe(_NodeTarget target, {Duration timeout = const Duration(milliseconds: 1500)}) async {
-    final watch = Stopwatch()..start();
-    try {
-      await InternetAddress.lookup(target.host).timeout(timeout);
-      final ms = watch.elapsedMilliseconds;
-      return ms > 0 ? ms : 1;
-    } catch (_) {
-      return 65535;
-    } finally {
-      watch.stop();
-    }
-  }
-
   Future<int?> _runOfflineTargetProbe(_NodeTarget target) {
     if (target.protocol == 'tuic') {
-      return _runDnsProbe(target, timeout: const Duration(milliseconds: 1400));
+      return Future<int?>.value(65535);
     }
     if (target.protocol == 'hysteria' || target.protocol == 'hysteria2') {
       return _runTcpProbe(target, timeout: const Duration(milliseconds: 1800));
@@ -779,6 +766,16 @@ class V2etDashboardPage extends HookConsumerWidget {
     if (!connected) {
       if (directTarget == null) {
         return 65535;
+      }
+      if (directTarget.protocol == 'tuic') {
+        final realProbe = await _runLinkProbe(
+          ref,
+          groupTag: groupTag,
+          outboundTag: item.selectTag,
+          restoreTag: restoreTag,
+          timeout: const Duration(seconds: 6),
+        );
+        return realProbe;
       }
       return _runOfflineTargetProbe(directTarget);
     }

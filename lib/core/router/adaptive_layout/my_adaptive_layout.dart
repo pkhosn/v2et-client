@@ -105,7 +105,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       selectedIndex: navigationShell.currentIndex,
                       onTap: (index) => _onTap(context, index),
                       onNoticeTap: () => ref.read(v2etNoticeDialogTriggerProvider.notifier).state++,
-                      onSettingsTap: () => navigationShell.goBranch(3, initialLocation: true),
+                      onSettingsTap: () => navigationShell.goBranch(9, initialLocation: true),
                     ),
                     Expanded(child: navigationShell),
                   ],
@@ -201,7 +201,13 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       return switch (navigationShell.currentIndex) {
         0 => 'home',
         1 => 'profiles',
-        2 => 'about',
+        2 => 'profiles',
+        3 => 'logs',
+        4 => 'profiles',
+        5 => 'settings',
+        6 => 'logs',
+        7 => 'settings',
+        8 => 'about',
         _ => 'settings',
       };
     }
@@ -219,6 +225,12 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       return [
         ShellRouteAction(Icons.dashboard_customize_rounded, zh ? '仪表盘' : 'Dashboard'),
         ShellRouteAction(Icons.shopping_bag_rounded, zh ? '商店' : 'Store'),
+        ShellRouteAction(Icons.hub_rounded, zh ? '代理' : 'Proxies'),
+        ShellRouteAction(Icons.terminal_rounded, zh ? '日志' : 'Logs'),
+        ShellRouteAction(Icons.view_list_rounded, zh ? '配置' : 'Profiles'),
+        ShellRouteAction(Icons.rule_rounded, zh ? '规则' : 'Rules'),
+        ShellRouteAction(Icons.travel_explore_rounded, zh ? '请求' : 'Requests'),
+        ShellRouteAction(Icons.settings_ethernet_rounded, zh ? '连接' : 'Connections'),
         ShellRouteAction(Icons.account_circle_rounded, zh ? '我的' : 'Me'),
       ];
     }

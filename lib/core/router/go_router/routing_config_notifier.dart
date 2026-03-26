@@ -22,11 +22,14 @@ import 'package:hiddify/features/settings/overview/sections/route_options_page.d
 import 'package:hiddify/features/settings/overview/sections/tls_tricks_page.dart';
 import 'package:hiddify/features/settings/overview/sections/warp_options_page.dart';
 import 'package:hiddify/features/settings/overview/settings_page.dart';
+import 'package:hiddify/features/route_rules/overview/rules_page.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/presentation/v2et_dashboard_page.dart';
+import 'package:hiddify/v2et/presentation/v2et_connections_page.dart';
 import 'package:hiddify/v2et/presentation/v2et_login_page.dart';
 import 'package:hiddify/v2et/presentation/v2et_me_page.dart';
+import 'package:hiddify/v2et/presentation/v2et_requests_page.dart';
 import 'package:hiddify/v2et/presentation/v2et_store_page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -142,6 +145,62 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                         name: 'store',
                         path: '/store',
                         builder: (_, _) => FocusScope(node: branchesScope['profiles'], child: const V2etStorePage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'v2etProxies',
+                        path: '/v2et-proxies',
+                        builder: (_, _) =>
+                            FocusScope(node: branchesScope['profiles'], child: const ProxiesOverviewPage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'v2etLogs',
+                        path: '/v2et-logs',
+                        builder: (_, _) => FocusScope(node: branchesScope['logs'], child: const LogsPage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'v2etProfiles',
+                        path: '/v2et-profiles',
+                        builder: (_, _) => FocusScope(node: branchesScope['profiles'], child: const ProfilesPage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'v2etRules',
+                        path: '/v2et-rules',
+                        builder: (_, _) => FocusScope(node: branchesScope['settings'], child: const RulesPage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'v2etRequests',
+                        path: '/v2et-requests',
+                        builder: (_, _) => FocusScope(node: branchesScope['logs'], child: const V2etRequestsPage()),
+                      ),
+                    ],
+                  ),
+                  StatefulShellBranch(
+                    routes: <GoRoute>[
+                      GoRoute(
+                        name: 'v2etConnections',
+                        path: '/v2et-connections',
+                        builder: (_, _) =>
+                            FocusScope(node: branchesScope['settings'], child: const V2etConnectionsPage()),
                       ),
                     ],
                   ),

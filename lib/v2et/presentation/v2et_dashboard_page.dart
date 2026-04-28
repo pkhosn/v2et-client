@@ -475,32 +475,27 @@ class V2etDashboardPage extends HookConsumerWidget {
                       const SizedBox(height: 10),
                       ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
-                        child: _Card(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                            child: Row(
-                              children: [
-                                for (final key in const ['smart', 'global', 'tun']) ...[
-                                  Expanded(
-                                    child: _ModeChip(
-                                      label: switch (key) {
-                                        'smart' => tr('智能', 'Smart'),
-                                        'global' => tr('全局', 'Global'),
-                                        _ => 'TUN',
-                                      },
-                                      selected: _serviceModeKey(serviceMode) == key,
-                                      onTap: () async {
-                                        await ref
-                                            .read(ConfigOptions.serviceMode.notifier)
-                                            .update(_serviceModeFromKey(key));
-                                      },
-                                    ),
-                                  ),
-                                  if (key != 'tun') const SizedBox(width: 8),
-                                ],
-                              ],
-                            ),
-                          ),
+                        child: Row(
+                          children: [
+                            for (final key in const ['smart', 'global', 'tun']) ...[
+                              Expanded(
+                                child: _ModeChip(
+                                  label: switch (key) {
+                                    'smart' => tr('智能', 'Smart'),
+                                    'global' => tr('全局', 'Global'),
+                                    _ => 'TUN',
+                                  },
+                                  selected: _serviceModeKey(serviceMode) == key,
+                                  onTap: () async {
+                                    await ref
+                                        .read(ConfigOptions.serviceMode.notifier)
+                                        .update(_serviceModeFromKey(key));
+                                  },
+                                ),
+                              ),
+                              if (key != 'tun') const SizedBox(width: 8),
+                            ],
+                          ],
                         ),
                       ),
                       const SizedBox(height: 10),

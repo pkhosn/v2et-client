@@ -406,9 +406,9 @@ class _SettingCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 32)),
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(color: Color(0xFF76717E), fontSize: 16)),
+                    Text(subtitle, style: const TextStyle(color: Color(0xFF76717E), fontSize: 14)),
                   ],
                 ),
               ),
@@ -446,8 +446,8 @@ class _SettingRow extends StatelessWidget {
         backgroundColor: const Color(0xFFE8EAF0),
         child: Icon(icon, color: const Color(0xFF4E5A69)),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-      subtitle: Text(subtitle, style: const TextStyle(color: Color(0xFF7A7582))),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Color(0xFF7A7582), fontSize: 13)),
       trailing: trailing,
     );
   }
@@ -461,7 +461,7 @@ class _JumpRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => context.go(context.namedLocation(routeName)),
     );

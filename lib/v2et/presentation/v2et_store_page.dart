@@ -891,25 +891,30 @@ class _OfferCard extends ConsumerWidget {
     if (isDesktop) {
       final available = await WebviewWindow.isWebviewAvailable();
       if (available) {
-        final viewport = MediaQuery.sizeOf(context);
-        final maxWidth = viewport.width > 0 ? viewport.width : 1280;
-        final maxHeight = viewport.height > 0 ? viewport.height : 720;
-        final windowWidth = min(max((maxWidth * 0.98).round(), 760), maxWidth.round());
-        final windowHeight = min(max((maxHeight * 0.96).round(), 560), maxHeight.round());
-        final webview = await WebviewWindow.create(
-          configuration: CreateConfiguration(
-            title: tr('支付窗口', 'Payment Window'),
-            titleBarTopPadding: 8,
-            windowWidth: windowWidth,
-            windowHeight: windowHeight,
-          ),
-        );
-        webview.addScriptToExecuteOnDocumentCreated(_responsiveWebviewScript);
-        webview.launch(url);
-        Future<void>.delayed(const Duration(milliseconds: 900), () {
-          webview.evaluateJavaScript(_responsiveWebviewScript).catchError((_) => null);
-        });
-        return true;
+        try {
+          final viewport = MediaQuery.sizeOf(context);
+          final maxWidth = viewport.width > 0 ? viewport.width : 1280;
+          final maxHeight = viewport.height > 0 ? viewport.height : 720;
+          final windowWidth = min(max((maxWidth * 0.98).round(), 760), maxWidth.round());
+          final windowHeight = min(max((maxHeight * 0.96).round(), 560), maxHeight.round());
+          final webview = await WebviewWindow.create(
+            configuration: CreateConfiguration(
+              title: tr('支付窗口', 'Payment Window'),
+              titleBarTopPadding: 8,
+              windowWidth: windowWidth,
+              windowHeight: windowHeight,
+            ),
+          );
+          webview.addScriptToExecuteOnDocumentCreated(_responsiveWebviewScript);
+          webview.launch(url);
+          Future<void>.delayed(const Duration(milliseconds: 900), () {
+            webview.evaluateJavaScript(_responsiveWebviewScript).catchError((_) => null);
+          });
+          return true;
+        } catch (_) {
+          final openedExternal = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return openedExternal;
+        }
       }
     }
 

@@ -15,7 +15,6 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class MyAdaptiveLayout extends HookConsumerWidget {
   const MyAdaptiveLayout({
@@ -106,6 +105,15 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       onTap: (index) => _onTap(context, index),
                       onNoticeTap: () => ref.read(v2etNoticeDialogTriggerProvider.notifier).state++,
                       onSettingsTap: () => navigationShell.goBranch(3, initialLocation: true),
+                      onLogoutTap: () async {
+                        await ref.read(v2etRepositoryProvider).logout();
+                        ref.read(v2etSessionUnlockedProvider.notifier).state = false;
+                        ref.invalidate(v2etSessionProvider);
+                        ref.invalidate(v2etNoticesProvider);
+                        if (context.mounted) {
+                          context.go('/v2et-login');
+                        }
+                      },
                     ),
                     Expanded(child: navigationShell),
                   ],
@@ -131,10 +139,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       }
                       return;
                     }
-                    var opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
-                    if (!opened) {
-                      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
+                    await openV2etSupport(context, uri, title: zh ? '在线客服' : 'Live Support');
                   },
                   child: const Icon(Icons.support_agent_rounded),
                 ),
@@ -244,6 +249,7 @@ class _V2etDesktopSidebar extends StatelessWidget {
     required this.onTap,
     required this.onNoticeTap,
     required this.onSettingsTap,
+    required this.onLogoutTap,
   });
 
   final List<ShellRouteAction> actions;
@@ -251,6 +257,7 @@ class _V2etDesktopSidebar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final VoidCallback onNoticeTap;
   final VoidCallback onSettingsTap;
+  final VoidCallback onLogoutTap;
 
   @override
   Widget build(BuildContext context) {
@@ -262,24 +269,7 @@ class _V2etDesktopSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 16),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: const Color(0xFFE8E2F1), borderRadius: BorderRadius.circular(10)),
-            child: const Center(
-              child: Text(
-                'K',
-                style: TextStyle(
-                  color: Color(0xFF4E5DCC),
-                  fontWeight: FontWeight.w800,
-                  fontStyle: FontStyle.italic,
-                  fontSize: 24,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 8),
           for (var i = 0; i < actions.length; i++)
             _V2etNavItem(
               icon: actions[i].icon,
@@ -295,6 +285,10 @@ class _V2etDesktopSidebar extends StatelessWidget {
           IconButton(
             onPressed: onSettingsTap,
             icon: const Icon(Icons.settings_rounded, color: Color(0xFF6D6977), size: 24),
+          ),
+          IconButton(
+            onPressed: onLogoutTap,
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFF6D6977), size: 24),
           ),
           const SizedBox(height: 12),
         ],

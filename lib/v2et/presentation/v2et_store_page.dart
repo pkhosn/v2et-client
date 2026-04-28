@@ -668,6 +668,7 @@ class _OfferCard extends ConsumerWidget {
     final qrPayload = isHtml ? null : raw;
     var paymentWindowOpened = false;
     var paymentWindowOpening = false;
+    var autoOpenAttempted = false;
     String? paymentWindowHint;
 
     await showDialog<void>(
@@ -756,7 +757,8 @@ class _OfferCard extends ConsumerWidget {
               }
             }
 
-            if (paymentUri != null && !paymentWindowOpened && !paymentWindowOpening) {
+            if (paymentUri != null && !paymentWindowOpened && !paymentWindowOpening && !autoOpenAttempted) {
+              autoOpenAttempted = true;
               Future<void>.microtask(openPaymentWindow);
             }
 

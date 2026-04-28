@@ -10,6 +10,22 @@ import 'package:url_launcher/url_launcher.dart';
 Uri? buildV2etSupportUri(V2etRuntimeConfig? config) {
   if (config == null) return null;
 
+  final provider = _normalizeProvider(config.supportProvider);
+  final crispId = (config.crispWebsiteId ?? '').trim();
+  final tawkPropertyId = (config.tawktoPropertyId ?? '').trim();
+  final tawkWidgetId = (config.tawktoWidgetId ?? '').trim();
+  final chatwayWidgetId = (config.chatwayWidgetId ?? '').trim();
+
+  if (provider == 'crisp' && crispId.isNotEmpty) {
+    return Uri.parse('https://go.crisp.chat/chat/embed/?website_id=$crispId');
+  }
+  if ((provider == 'tawkto' || provider == 'tawk') && tawkPropertyId.isNotEmpty && tawkWidgetId.isNotEmpty) {
+    return Uri.parse('https://tawk.to/chat/$tawkPropertyId/$tawkWidgetId');
+  }
+  if (provider == 'chatway' && chatwayWidgetId.isNotEmpty) {
+    return Uri.parse('https://go.chatway.app/chat/$chatwayWidgetId');
+  }
+
   final direct = _parseUri(config.supportUrl);
   if (direct != null) {
     return direct;
@@ -21,9 +37,14 @@ Uri? buildV2etSupportUri(V2etRuntimeConfig? config) {
     return payloadUri;
   }
 
-  final crispId = (config.crispWebsiteId ?? '').trim();
   if (crispId.isNotEmpty) {
     return Uri.parse('https://go.crisp.chat/chat/embed/?website_id=$crispId');
+  }
+  if (tawkPropertyId.isNotEmpty && tawkWidgetId.isNotEmpty) {
+    return Uri.parse('https://tawk.to/chat/$tawkPropertyId/$tawkWidgetId');
+  }
+  if (chatwayWidgetId.isNotEmpty) {
+    return Uri.parse('https://go.chatway.app/chat/$chatwayWidgetId');
   }
 
   final scriptUrl = (config.supportScriptUrl ?? '').trim();
@@ -76,8 +97,8 @@ Future<bool> openV2etSupport(
       final viewport = MediaQuery.sizeOf(context);
       final maxWidth = viewport.width > 0 ? viewport.width : 1280;
       final maxHeight = viewport.height > 0 ? viewport.height : 720;
-      final windowWidth = min(max((maxWidth * 0.92).round(), 860), maxWidth.round());
-      final windowHeight = min(max((maxHeight * 0.9).round(), 620), maxHeight.round());
+      final windowWidth = min(380, maxWidth.round());
+      final windowHeight = min(518, maxHeight.round());
       final webview = await WebviewWindow.create(
         configuration: CreateConfiguration(
           title: title,
@@ -121,6 +142,32 @@ Uri? _buildEmbedFromRaw(String raw) {
         final map = decoded.map((k, v) => MapEntry(k.toString(), v));
         final direct = _parseUri(map['url']?.toString());
         if (direct != null) return direct;
+        final tawkPropertyId =
+            map['tawkto_property_id']?.toString().trim() ??
+            map['tawk_property_id']?.toString().trim() ??
+            map['tawktoPropertyId']?.toString().trim() ??
+            '';
+        final tawkWidgetId =
+            map['tawkto_widget_id']?.toString().trim() ??
+            map['tawk_widget_id']?.toString().trim() ??
+            map['tawktoWidgetId']?.toString().trim() ??
+            '';
+        if (tawkPropertyId.isNotEmpty && tawkWidgetId.isNotEmpty) {
+          return Uri.parse('https://tawk.to/chat/$tawkPropertyId/$tawkWidgetId');
+        }
+        final chatwayWidgetId =
+            map['chatway_widget_id']?.toString().trim() ?? map['chatwayWidgetId']?.toString().trim() ?? '';
+        if (chatwayWidgetId.isNotEmpty) {
+          return Uri.parse('https://go.chatway.app/chat/$chatwayWidgetId');
+        }
+        final crispId =
+            map['crisp_website_id']?.toString().trim() ??
+            map['crispid']?.toString().trim() ??
+            map['website_id']?.toString().trim() ??
+            '';
+        if (crispId.isNotEmpty) {
+          return Uri.parse('https://go.crisp.chat/chat/embed/?website_id=$crispId');
+        }
         final scriptUrl = map['script_url']?.toString().trim() ?? '';
         if (scriptUrl.isNotEmpty) {
           return _buildEmbedFromRaw(scriptUrl);
@@ -157,4 +204,13 @@ Uri? _buildEmbedFromRaw(String raw) {
   }
 
   return null;
+}
+
+String _normalizeProvider(String? raw) {
+  final value = (raw ?? '').trim().toLowerCase();
+  if (value.isEmpty) return '';
+  if (value.contains('crisp')) return 'crisp';
+  if (value.contains('tawk')) return 'tawkto';
+  if (value.contains('chatway')) return 'chatway';
+  return value;
 }

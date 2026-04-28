@@ -10,6 +10,9 @@ class V2etRuntimeConfig {
     required this.primaryColorHex,
     required this.surfaceColorHex,
     required this.crispWebsiteId,
+    required this.tawktoPropertyId,
+    required this.tawktoWidgetId,
+    required this.chatwayWidgetId,
     required this.banners,
     required this.builtinProxyEnabled,
     required this.allowCustomPort,
@@ -30,6 +33,9 @@ class V2etRuntimeConfig {
   final String? primaryColorHex;
   final String? surfaceColorHex;
   final String? crispWebsiteId;
+  final String? tawktoPropertyId;
+  final String? tawktoWidgetId;
+  final String? chatwayWidgetId;
   final List<V2etRuntimeBanner> banners;
   final bool builtinProxyEnabled;
   final bool allowCustomPort;
@@ -69,6 +75,9 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
         primaryColorHex: null,
         surfaceColorHex: null,
         crispWebsiteId: null,
+        tawktoPropertyId: null,
+        tawktoWidgetId: null,
+        chatwayWidgetId: null,
         banners: [],
         builtinProxyEnabled: false,
         allowCustomPort: true,
@@ -112,6 +121,33 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       'v2et.crisp.website_id',
       'v2et.crispid',
       'v2et.crisp_id',
+    ]);
+    final tawktoPropertyId = _readStringByPaths(map, const [
+      'support.tawkto_property_id',
+      'support.tawk_property_id',
+      'support.tawktoPropertyId',
+      'support.tawkPropertyId',
+      'tawkto.property_id',
+      'tawk.property_id',
+      'features.support.tawkto_property_id',
+      'v2et.support.tawkto_property_id',
+    ]);
+    final tawktoWidgetId = _readStringByPaths(map, const [
+      'support.tawkto_widget_id',
+      'support.tawk_widget_id',
+      'support.tawktoWidgetId',
+      'support.tawkWidgetId',
+      'tawkto.widget_id',
+      'tawk.widget_id',
+      'features.support.tawkto_widget_id',
+      'v2et.support.tawkto_widget_id',
+    ]);
+    final chatwayWidgetId = _readStringByPaths(map, const [
+      'support.chatway_widget_id',
+      'support.chatwayWidgetId',
+      'chatway.widget_id',
+      'features.support.chatway_widget_id',
+      'v2et.support.chatway_widget_id',
     ]);
     final builtinProxyEnabled =
         _readBoolByPaths(map, const [
@@ -187,6 +223,9 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       primaryColorHex: primaryColor,
       surfaceColorHex: surfaceColor,
       crispWebsiteId: crispId,
+      tawktoPropertyId: tawktoPropertyId,
+      tawktoWidgetId: tawktoWidgetId,
+      chatwayWidgetId: chatwayWidgetId,
       banners: _readBanners(map),
       builtinProxyEnabled: builtinProxyEnabled,
       allowCustomPort: allowCustomPort,
@@ -208,6 +247,9 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       primaryColorHex: null,
       surfaceColorHex: null,
       crispWebsiteId: null,
+      tawktoPropertyId: null,
+      tawktoWidgetId: null,
+      chatwayWidgetId: null,
       banners: [],
       builtinProxyEnabled: false,
       allowCustomPort: true,

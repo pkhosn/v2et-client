@@ -31,7 +31,7 @@ class V2etEndpointResolver {
 
     final directUrl = await _tryExtractApiUrl(normalized);
     if (directUrl != null) {
-      return _normalizeBase(directUrl);
+      return _preferHttps(_normalizeBase(directUrl));
     }
 
     for (final path in _configPathCandidates) {
@@ -42,11 +42,22 @@ class V2etEndpointResolver {
       );
       final extracted = await _tryExtractApiUrl(candidate);
       if (extracted != null) {
-        return _normalizeBase(extracted);
+        return _preferHttps(_normalizeBase(extracted));
       }
     }
 
-    return normalized;
+    return _preferHttps(normalized);
+  }
+
+  Uri _preferHttps(Uri uri) {
+    if (uri.scheme.toLowerCase() != 'http') {
+      return uri;
+    }
+    final host = uri.host.toLowerCase();
+    if (host == 'localhost' || host == '127.0.0.1' || host == '::1') {
+      return uri;
+    }
+    return uri.replace(scheme: 'https');
   }
 
   Future<Uri?> _tryExtractApiUrl(Uri uri) async {

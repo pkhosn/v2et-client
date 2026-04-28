@@ -85,10 +85,7 @@ class V2etMePage extends HookConsumerWidget {
             showV2etNotice(context, tr('未配置客服入口', 'Support is not configured'), error: true);
             break;
           }
-          var opened = await launchUrl(supportUri, mode: LaunchMode.inAppWebView);
-          if (!opened) {
-            opened = await launchUrl(supportUri, mode: LaunchMode.externalApplication);
-          }
+          await openV2etSupport(context, supportUri, title: tr('在线客服', 'Live Support'));
           break;
         case 'group':
           await launchConfiguredUrl(runtimeConfig?.groupUrl);

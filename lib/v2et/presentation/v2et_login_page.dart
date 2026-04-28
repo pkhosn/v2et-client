@@ -18,7 +18,6 @@ import 'package:hiddify/v2et/model/v2board_credentials.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 enum _AuthMode { login, register, forgot }
 
@@ -192,10 +191,7 @@ class V2etLoginPage extends HookConsumerWidget {
                   }
                   return;
                 }
-                var opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
-                if (!opened) {
-                  opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
+                await openV2etSupport(context, uri, title: tr('在线客服', 'Live Support'));
               },
               child: const Icon(Icons.support_agent_rounded),
             ),
@@ -354,7 +350,22 @@ class V2etLoginPage extends HookConsumerWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(modeSubtitle, style: const TextStyle(color: Color(0xFF5F5A67), fontSize: 16)),
-                          const SizedBox(height: 56),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECE5F6),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              children: [
+                                _modeButton(context, tr('登录', 'Login'), _AuthMode.login, authMode, loading.value),
+                                _modeButton(context, tr('注册', 'Register'), _AuthMode.register, authMode, loading.value),
+                                _modeButton(context, tr('找回', 'Reset'), _AuthMode.forgot, authMode, loading.value),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 28),
                           if (authMode.value == _AuthMode.login) ...[
                             _V2etInputField(
                               label: tr('邮箱', 'Email'),
@@ -877,6 +888,39 @@ class _V2etInputField extends StatelessWidget {
       ],
     );
   }
+}
+
+Widget _modeButton(
+  BuildContext context,
+  String label,
+  _AuthMode mode,
+  ValueNotifier<_AuthMode> authMode,
+  bool loading,
+) {
+  final selected = authMode.value == mode;
+  return Expanded(
+    child: GestureDetector(
+      onTap: loading ? null : () => authMode.value = mode,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF5A3D89) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF4A4255),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _LabeledCheckbox extends StatelessWidget {

@@ -603,6 +603,13 @@ class _OfferCard extends ConsumerWidget {
   }) async {
     try {
       final api = ref.read(v2etPortalApiProvider);
+      final cleared = await api.clearPendingOrders(session);
+      if (cleared > 0 && context.mounted) {
+        showV2etNotice(
+          context,
+          tr('检测到待支付订单，已自动清理 $cleared 笔后继续下单', 'Cleared $cleared pending order(s), continuing checkout'),
+        );
+      }
       final tradeNo = await api.createOrder(
         session: session,
         planId: planId,

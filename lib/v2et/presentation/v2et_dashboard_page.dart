@@ -15,6 +15,8 @@ import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
@@ -43,6 +45,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final noticeTrigger = ref.watch(v2etNoticeDialogTriggerProvider);
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
     final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const <V2etStoreOffer>[];
+    final serviceMode = ref.watch(ConfigOptions.serviceMode);
     final selectedNode = useState<String?>(null);
     final noticeShown = useState(false);
     final statusNotifiedKey = useState<String?>(null);
@@ -469,6 +472,37 @@ class V2etDashboardPage extends HookConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 10),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
+                        child: _Card(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            child: Row(
+                              children: [
+                                for (final key in const ['smart', 'global', 'tun']) ...[
+                                  Expanded(
+                                    child: _ModeChip(
+                                      label: switch (key) {
+                                        'smart' => tr('智能', 'Smart'),
+                                        'global' => tr('全局', 'Global'),
+                                        _ => 'TUN',
+                                      },
+                                      selected: _serviceModeKey(serviceMode) == key,
+                                      onTap: () async {
+                                        await ref
+                                            .read(ConfigOptions.serviceMode.notifier)
+                                            .update(_serviceModeFromKey(key));
+                                      },
+                                    ),
+                                  ),
+                                  if (key != 'tun') const SizedBox(width: 8),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                     ],
                   ),
                 ),
@@ -478,6 +512,20 @@ class V2etDashboardPage extends HookConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _serviceModeKey(ServiceMode mode) {
+    if (mode == ServiceMode.tun) return 'tun';
+    if (mode == ServiceMode.proxy) return 'global';
+    return 'smart';
+  }
+
+  ServiceMode _serviceModeFromKey(String key) {
+    return switch (key) {
+      'tun' => ServiceMode.tun,
+      'global' => ServiceMode.proxy,
+      _ => Platform.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy,
+    };
   }
 
   Future<void> _syncSubscriptionAndProfile(WidgetRef ref) async {
@@ -1003,6 +1051,39 @@ class V2etDashboardPage extends HookConsumerWidget {
       if (t.contains(e.key)) return e.value;
     }
     return '🌐';
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: selected ? const Color(0xFF5A3D89) : const Color(0xFFD4CEDD)),
+          color: selected ? const Color(0xFFECE6F7) : const Color(0xFFF7F4FA),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: selected ? const Color(0xFF4A2E79) : const Color(0xFF585362),
+          ),
+        ),
+      ),
+    );
   }
 }
 

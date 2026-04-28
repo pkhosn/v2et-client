@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/model/constants.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/profile/add/widgets/widgets.dart';
 import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
@@ -17,6 +18,7 @@ class FixBtns extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
+    final v2etEnabled = ref.watch(Preferences.enableV2etAdapter);
 
     final isDesktop = PlatformUtils.isDesktop;
     return Row(
@@ -35,17 +37,19 @@ class FixBtns extends ConsumerWidget {
             },
           ),
         ],
-        const Gap(AddProfileModalConst.fixBtnsGap),
-        FixBtn(
-          key: const ValueKey('add_from_clipboard_button'),
-          height: height,
-          title: t.common.clipboard,
-          icon: Icons.content_paste,
-          onTap: () async {
-            final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
-            ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
-          },
-        ),
+        if (!v2etEnabled) ...[
+          const Gap(AddProfileModalConst.fixBtnsGap),
+          FixBtn(
+            key: const ValueKey('add_from_clipboard_button'),
+            height: height,
+            title: t.common.clipboard,
+            icon: Icons.content_paste,
+            onTap: () async {
+              final cr = await Clipboard.getData(Clipboard.kTextPlain).then((value) => value?.text ?? '');
+              ref.read(addProfileNotifierProvider.notifier).addClipboard(cr);
+            },
+          ),
+        ],
         const Gap(AddProfileModalConst.fixBtnsGap),
         FixBtn(
           key: const ValueKey('add_manually_button'),

@@ -440,6 +440,86 @@ class V2etPortalApi {
     await _authPost(session, '/api/v1/user/order/cancel', data: {'trade_no': tradeNo});
   }
 
+  Future<int> clearPendingOrders(V2boardSession session) async {
+    final json = await _authGet(session, '/api/v1/user/order/fetch');
+    final rows = _readList(_readMapNullable(json['data'])?['data'] ?? json['data']);
+    var cleared = 0;
+    for (final row in rows) {
+      final tradeNo = _readString(row['trade_no']);
+      if (tradeNo == null || tradeNo.isEmpty) continue;
+      final statusCode = _readInt(row['status']);
+      final statusText = _readString(row['status_name'])?.toLowerCase() ?? '';
+      final isPending =
+          statusCode == 0 ||
+          statusText.contains('pending') ||
+          statusText.contains('unpaid') ||
+          statusText.contains('待支付') ||
+          statusText.contains('未支付');
+      if (!isPending) continue;
+      await cancelOrder(session: session, tradeNo: tradeNo);
+      cleared++;
+    }
+    return cleared;
+  }
+
+  Future<void> changePassword({
+    required V2boardSession session,
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    final paths = <String>[
+      '/api/v1/user/changePassword',
+      '/api/v1/user/change/password',
+      '/api/v1/user/resetPassword',
+      '/api/v1/user/password/update',
+    ];
+    Object? lastError;
+    for (final path in paths) {
+      try {
+        final resp = await _authPost(
+          session,
+          path,
+          data: {
+            'old_password': oldPassword,
+            'new_password': newPassword,
+            'new_password_confirmation': newPassword,
+            'password': newPassword,
+            'password_confirmation': newPassword,
+          },
+        );
+        final code = _readInt(resp['code']);
+        if (code != null && code != 0 && code != 200) {
+          final msg = _extractApiError(resp);
+          if (msg != null && msg.isNotEmpty) throw StateError(msg);
+        }
+        final status = _readInt(resp['status']) ?? _readInt(_readMapNullable(resp['data'])?['status']);
+        if (status != null && status != 1 && status != 200) {
+          final msg = _extractApiError(resp);
+          if (msg != null && msg.isNotEmpty) throw StateError(msg);
+        }
+        return;
+      } on DioException catch (e) {
+        final msg = _extractApiError(e.response?.data) ?? _readString(e.message) ?? 'Change password failed';
+        final lowered = msg.toLowerCase();
+        if (e.response?.statusCode == 404 ||
+            e.response?.statusCode == 405 ||
+            lowered.contains('not found') ||
+            lowered.contains('route')) {
+          lastError = StateError(msg);
+          continue;
+        }
+        throw StateError(msg);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw StateError(
+      _readString(lastError) ??
+          lastError?.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '') ??
+          'Change password endpoint is unavailable',
+    );
+  }
+
   Future<Map<String, dynamic>> _authGet(V2boardSession session, String path) async {
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;

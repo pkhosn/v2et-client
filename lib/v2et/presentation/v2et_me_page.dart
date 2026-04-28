@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
@@ -53,7 +52,6 @@ class V2etMePage extends HookConsumerWidget {
       _Entry(id: 'invite', icon: Icons.person_add_alt_1_rounded, label: tr('邀请管理', 'Invites')),
       _Entry(id: 'gift', icon: Icons.card_giftcard_rounded, label: tr('礼品卡兑换', 'Gift card')),
       _Entry(id: 'password', icon: Icons.lock_reset_rounded, label: tr('修改密码', 'Change password')),
-      _Entry(id: 'logout', icon: Icons.logout_rounded, label: tr('退出登录', 'Logout')),
     ];
 
     Future<void> launchConfiguredUrl(String? url) async {
@@ -105,32 +103,11 @@ class V2etMePage extends HookConsumerWidget {
         case 'password':
           await showDialog<void>(
             context: context,
-            builder: (_) => _ChangePasswordTipDialog(zh: zh),
+            builder: (_) => _ChangePasswordDialog(zh: zh),
           );
           break;
         case 'tickets':
           showV2etNotice(context, tr('工单模块开发中', 'Ticket page is under development'));
-          break;
-        case 'logout':
-          final shouldLogout = await showDialog<bool>(
-            context: context,
-            builder: (dialogContext) => AlertDialog(
-              title: Text(tr('退出登录', 'Logout')),
-              content: Text(tr('确认退出当前账号？', 'Are you sure you want to logout?')),
-              actions: [
-                TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(tr('取消', 'Cancel'))),
-                FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(tr('确定', 'Confirm'))),
-              ],
-            ),
-          );
-          if (shouldLogout != true) break;
-          await ref.read(v2etRepositoryProvider).logout();
-          ref.read(v2etSessionUnlockedProvider.notifier).state = false;
-          ref.invalidate(v2etSessionProvider);
-          ref.invalidate(v2etNoticesProvider);
-          if (context.mounted) {
-            context.go('/v2et-login');
-          }
           break;
       }
     }
@@ -716,18 +693,104 @@ class _GiftCardDialogState extends ConsumerState<_GiftCardDialog> {
   }
 }
 
-class _ChangePasswordTipDialog extends StatelessWidget {
-  const _ChangePasswordTipDialog({required this.zh});
+class _ChangePasswordDialog extends ConsumerStatefulWidget {
+  const _ChangePasswordDialog({required this.zh});
   final bool zh;
 
-  String tr(String a, String b) => zh ? a : b;
+  @override
+  ConsumerState<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
+  final oldPasswordController = TextEditingController();
+  final newPasswordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
+  bool submitting = false;
+
+  String tr(String a, String b) => widget.zh ? a : b;
+
+  @override
+  void dispose() {
+    oldPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(tr('修改密码', 'Change password')),
-      content: Text(tr('请在登录页使用“忘记密码”流程重置密码。', 'Please use "Forgot Password" on login page.')),
-      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('知道了', 'OK')))],
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: oldPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: tr('旧密码', 'Old password')),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: tr('新密码', 'New password')),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: tr('确认新密码', 'Confirm new password')),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: submitting ? null : () => Navigator.of(context).pop(), child: Text(tr('取消', 'Cancel'))),
+        FilledButton(
+          onPressed: submitting
+              ? null
+              : () async {
+                  final oldPwd = oldPasswordController.text;
+                  final newPwd = newPasswordController.text;
+                  final confirmPwd = confirmPasswordController.text;
+                  if (oldPwd.isEmpty || newPwd.isEmpty || confirmPwd.isEmpty) {
+                    showV2etNotice(context, tr('请完整填写密码信息', 'Please complete all password fields'), error: true);
+                    return;
+                  }
+                  if (newPwd != confirmPwd) {
+                    showV2etNotice(context, tr('两次新密码输入不一致', 'New passwords do not match'), error: true);
+                    return;
+                  }
+                  if (newPwd.length < 6) {
+                    showV2etNotice(context, tr('新密码长度至少 6 位', 'New password must be at least 6 characters'), error: true);
+                    return;
+                  }
+                  final session = await ref.read(v2etRepositoryProvider).restoreSession();
+                  if (session == null || !session.hasToken) {
+                    if (!context.mounted) return;
+                    showV2etNotice(context, tr('登录已失效，请重新登录', 'Session expired, please login again'), error: true);
+                    return;
+                  }
+                  setState(() => submitting = true);
+                  try {
+                    await ref
+                        .read(v2etPortalApiProvider)
+                        .changePassword(session: session, oldPassword: oldPwd, newPassword: newPwd);
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                    showV2etNotice(context, tr('密码修改成功', 'Password changed successfully'));
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    showV2etNotice(context, e.toString().replaceFirst(RegExp(r'^Bad state:\s*'), ''), error: true);
+                  } finally {
+                    if (mounted) setState(() => submitting = false);
+                  }
+                },
+          child: Text(submitting ? tr('提交中...', 'Submitting...') : tr('确认修改', 'Confirm')),
+        ),
+      ],
     );
   }
 }

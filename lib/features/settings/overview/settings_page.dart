@@ -8,8 +8,6 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
 import 'package:hiddify/features/settings/notifier/reset_tunnel/reset_tunnel_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -37,9 +35,6 @@ class SettingsPage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final appInfo = ref.watch(appInfoProvider).valueOrNull;
     final v2etEnabled = ref.watch(Preferences.enableV2etAdapter);
-    final zh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('zh');
-    final serviceMode = ref.watch(ConfigOptions.serviceMode);
-    String tr(String a, String b) => zh ? a : b;
     // final scrollController = useScrollController();
 
     // useMemoized(
@@ -70,7 +65,8 @@ class SettingsPage extends HookConsumerWidget {
             : null,
         title: Text(t.pages.settings.title),
         actions: [
-          MenuAnchor(
+          if (!v2etEnabled)
+            MenuAnchor(
             menuChildren: <Widget>[
               SubmenuButton(
                 menuChildren: <Widget>[
@@ -147,66 +143,11 @@ class SettingsPage extends HookConsumerWidget {
               icon: const Icon(Icons.more_vert_rounded),
             ),
           ),
-          const Gap(8),
+          if (!v2etEnabled) const Gap(8),
         ],
       ),
       body: ListView(
         children: [
-          Material(
-            child: ListTile(
-              leading: const Icon(Icons.tune_rounded),
-              title: Text(tr('连接模式', 'Connection mode')),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    value: 'smart',
-                    groupValue: serviceMode == ServiceMode.proxy
-                        ? 'global'
-                        : serviceMode == ServiceMode.tun
-                        ? 'tun'
-                        : 'smart',
-                    onChanged: (_) async {
-                      await ref
-                          .read(ConfigOptions.serviceMode.notifier)
-                          .update(PlatformUtils.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy);
-                    },
-                    title: Text(tr('智能分流', 'Smart')),
-                  ),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    value: 'global',
-                    groupValue: serviceMode == ServiceMode.proxy
-                        ? 'global'
-                        : serviceMode == ServiceMode.tun
-                        ? 'tun'
-                        : 'smart',
-                    onChanged: (_) async {
-                      await ref.read(ConfigOptions.serviceMode.notifier).update(ServiceMode.proxy);
-                    },
-                    title: Text(tr('全局代理', 'Global')),
-                  ),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    value: 'tun',
-                    groupValue: serviceMode == ServiceMode.proxy
-                        ? 'global'
-                        : serviceMode == ServiceMode.tun
-                        ? 'tun'
-                        : 'smart',
-                    onChanged: (_) async {
-                      await ref.read(ConfigOptions.serviceMode.notifier).update(ServiceMode.tun);
-                    },
-                    title: const Text('TUN'),
-                  ),
-                ],
-              ),
-            ),
-          ),
           // TipCard(message: t.settings.experimentalMsg),
           SettingsSection(
             title: t.pages.settings.general.title,

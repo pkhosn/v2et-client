@@ -72,5 +72,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-quick-exe
-          path: out/v2et-windows-setup.exe
+          path: out/*.exe
           retention-days: 7

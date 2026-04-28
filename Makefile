@@ -476,7 +476,23 @@ android-aab-libs: android-libs
 
 windows-libs:
 	$(MKDIR) $(DESKTOP_OUT) || echo Folder already exists. Skipping...
-	curl -L $(CORE_URL)/$(CORE_NAME)-windows-amd64.tar.gz | tar xz -C $(DESKTOP_OUT)/
+	@set -e; \
+	ARCHIVE="$(CORE_NAME)-windows-amd64.tar.gz"; \
+	PRIMARY_URL="$(CORE_URL)/$$ARCHIVE"; \
+	FALLBACK_URL="https://github.com/hiddify/hiddify-next-core/releases/download/v$(core.version)/$$ARCHIVE"; \
+	echo "Downloading windows core from: $$PRIMARY_URL"; \
+	curl -fL "$$PRIMARY_URL" | tar xz -C $(DESKTOP_OUT)/; \
+	if [ ! -f "$(DESKTOP_OUT)/hiddify-core.dll" ] || [ ! -f "$(DESKTOP_OUT)/libcronet.dll" ] || [ ! -f "$(DESKTOP_OUT)/HiddifyCli.exe" ]; then \
+		echo "Downloaded core is incomplete for Windows (missing required runtime files)."; \
+		if [ "$(CHANNEL)" != "prod" ]; then \
+			echo "Retrying with pinned core version: $(core.version)"; \
+			rm -f "$(DESKTOP_OUT)/hiddify-core.dll" "$(DESKTOP_OUT)/libcronet.dll" "$(DESKTOP_OUT)/HiddifyCli.exe"; \
+			curl -fL "$$FALLBACK_URL" | tar xz -C $(DESKTOP_OUT)/; \
+		fi; \
+	fi; \
+	test -f "$(DESKTOP_OUT)/hiddify-core.dll"; \
+	test -f "$(DESKTOP_OUT)/libcronet.dll"; \
+	test -f "$(DESKTOP_OUT)/HiddifyCli.exe"; \
 	ls $(DESKTOP_OUT) || dir $(DESKTOP_OUT)/
 	
 

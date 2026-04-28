@@ -524,7 +524,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     return switch (key) {
       'tun' => ServiceMode.tun,
       'global' => ServiceMode.proxy,
-      _ => Platform.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy,
+      _ => PlatformUtils.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy,
     };
   }
 

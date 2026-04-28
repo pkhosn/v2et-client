@@ -12,6 +12,7 @@ import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
+import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

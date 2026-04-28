@@ -343,8 +343,18 @@ class V2boardApiImpl implements V2boardApi {
   Uri _joinApi(Uri base, String path) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final basePath = _normalizeBasePath(base.path);
-    final mergedPath = basePath.isEmpty ? normalizedPath : '$basePath$normalizedPath';
+    final mergedPath = _mergeApiPath(basePath, normalizedPath);
     return base.replace(path: mergedPath, query: null, fragment: null);
+  }
+
+  String _mergeApiPath(String basePath, String normalizedPath) {
+    if (basePath.isEmpty) {
+      return normalizedPath;
+    }
+    if (basePath.endsWith('/api/v1') && normalizedPath.startsWith('/api/v1/')) {
+      return '$basePath${normalizedPath.substring('/api/v1'.length)}';
+    }
+    return '$basePath$normalizedPath';
   }
 
   String _normalizeBasePath(String raw) {

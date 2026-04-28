@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:hiddify/v2et/config/v2et_bootstrap_config.dart';
+import 'package:hiddify/v2et/model/v2et_api_proxy_config.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class V2etRuntimeConfig {
@@ -27,6 +28,7 @@ class V2etRuntimeConfig {
     required this.supportEmbedHtml,
     required this.expiryWarnDays,
     required this.trafficWarnBytes,
+    required this.apiProxy,
   });
 
   final bool enableNoticePopup;
@@ -50,6 +52,7 @@ class V2etRuntimeConfig {
   final String? supportEmbedHtml;
   final int expiryWarnDays;
   final int trafficWarnBytes;
+  final V2etApiProxyConfig? apiProxy;
 }
 
 class V2etRuntimeBanner {
@@ -92,6 +95,7 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
         supportEmbedHtml: null,
         expiryWarnDays: 3,
         trafficWarnBytes: 3 * 1024 * 1024 * 1024,
+        apiProxy: null,
       );
     }
 
@@ -217,6 +221,7 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
         ]) ??
         _readTrafficWarnBytesByGb(map) ??
         (3 * 1024 * 1024 * 1024);
+    final apiProxy = _readApiProxy(map);
 
     return V2etRuntimeConfig(
       enableNoticePopup: enabled ?? true,
@@ -240,6 +245,7 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       supportEmbedHtml: supportEmbedHtml,
       expiryWarnDays: expiryWarnDays,
       trafficWarnBytes: trafficWarnBytes,
+      apiProxy: apiProxy,
     );
   } catch (_) {
     return const V2etRuntimeConfig(
@@ -264,9 +270,53 @@ final v2etRuntimeConfigProvider = FutureProvider<V2etRuntimeConfig>((ref) async 
       supportEmbedHtml: null,
       expiryWarnDays: 3,
       trafficWarnBytes: 3 * 1024 * 1024 * 1024,
+      apiProxy: null,
     );
   }
 });
+
+V2etApiProxyConfig? _readApiProxy(Map<String, dynamic> map) {
+  final enabled = _readBoolByPaths(map, const [
+    'api_proxy.enabled',
+    'features.api_proxy.enabled',
+    'v2et.api_proxy.enabled',
+  ]);
+  final host = _readStringByPaths(map, const ['api_proxy.host', 'features.api_proxy.host', 'v2et.api_proxy.host']);
+  final port = _readIntByPaths(map, const ['api_proxy.port', 'features.api_proxy.port', 'v2et.api_proxy.port']);
+  final schemeRaw = _readStringByPaths(map, const [
+    'api_proxy.scheme',
+    'api_proxy.type',
+    'features.api_proxy.scheme',
+    'v2et.api_proxy.scheme',
+  ]);
+  final username = _readStringByPaths(map, const [
+    'api_proxy.username',
+    'features.api_proxy.username',
+    'v2et.api_proxy.username',
+  ]);
+  final password = _readStringByPaths(map, const [
+    'api_proxy.password',
+    'features.api_proxy.password',
+    'v2et.api_proxy.password',
+  ]);
+  if ((enabled ?? false) != true || host == null || host.isEmpty || port == null || port <= 0) {
+    return null;
+  }
+  final scheme = (schemeRaw ?? 'socks5').toLowerCase();
+  final normalized = switch (scheme) {
+    'http' => 'PROXY',
+    'https' => 'HTTPS',
+    _ => 'SOCKS5',
+  };
+  return V2etApiProxyConfig(
+    enabled: true,
+    scheme: normalized,
+    host: host,
+    port: port,
+    username: username,
+    password: password,
+  );
+}
 
 int? _readTrafficWarnBytesByGb(Map<String, dynamic> root) {
   final value = _readPathByPaths(root, const [

@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_credentials_store.dart';
 import 'package:hiddify/v2et/data/v2et_endpoint_resolver.dart';
+import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/data/v2et_repository.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -28,7 +29,7 @@ final v2etSessionProvider = FutureProvider<V2boardSession?>((ref) async {
 });
 
 final v2boardApiProvider = Provider<V2boardApi>((ref) {
-  return V2boardApiImpl();
+  return V2boardApiImpl(readApiProxy: () => ref.read(v2etRuntimeConfigProvider).valueOrNull?.apiProxy);
 });
 
 final v2etRepositoryProvider = Provider<V2etRepository>((ref) {

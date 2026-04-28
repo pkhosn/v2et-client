@@ -1,13 +1,19 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
+import 'package:hiddify/v2et/model/v2et_api_proxy_config.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 
 class V2etPortalApi {
-  V2etPortalApi({Dio? dio}) : _dio = dio ?? Dio();
+  V2etPortalApi({Dio? dio, this.readApiProxy}) : _dio = dio ?? Dio();
 
   final Dio _dio;
+  final V2etApiProxyConfig? Function()? readApiProxy;
+  DateTime? _lastProxyRefreshAt;
+  String? _lastProxyRule;
 
   Future<List<V2etNotice>> fetchNotices(V2boardSession session) async {
     final json = await _authGet(session, '/api/v1/user/notice/fetch');
@@ -419,6 +425,7 @@ class V2etPortalApi {
   }
 
   Future<int?> checkOrderStatus({required V2boardSession session, required String tradeNo}) async {
+    _refreshApiProxyIfNeeded();
     final uri = _resolveApiUri(session.baseUrl, '/api/v1/user/order/check', queryParameters: {'trade_no': tradeNo});
     DioException? last;
     for (final auth in [session.accessToken.trim(), 'Bearer ${session.accessToken.trim()}']) {
@@ -521,6 +528,7 @@ class V2etPortalApi {
   }
 
   Future<Map<String, dynamic>> _authGet(V2boardSession session, String path) async {
+    _refreshApiProxyIfNeeded();
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
     final referer = session.baseUrl.replace(path: '/').toString();
@@ -552,6 +560,7 @@ class V2etPortalApi {
     String path, {
     required Map<String, Object?> data,
   }) async {
+    _refreshApiProxyIfNeeded();
     final uri = _resolveApiUri(session.baseUrl, path);
     DioException? last;
     final referer = session.baseUrl.replace(path: '/').toString();
@@ -939,5 +948,24 @@ class V2etPortalApi {
       value = value.substring(0, value.length - 1);
     }
     return value;
+  }
+
+  void _refreshApiProxyIfNeeded() {
+    final now = DateTime.now();
+    if (_lastProxyRefreshAt != null && now.difference(_lastProxyRefreshAt!).inSeconds < 15) {
+      return;
+    }
+    _lastProxyRefreshAt = now;
+    final proxy = readApiProxy?.call();
+    final rule = (proxy != null && proxy.isUsable) ? proxy.findProxyRule : 'DIRECT';
+    if (rule == _lastProxyRule) return;
+    _lastProxyRule = rule;
+    _dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.findProxy = (_) => rule;
+        return client;
+      },
+    );
   }
 }

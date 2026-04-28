@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2board_subscription.dart';
+import 'package:hiddify/v2et/model/v2et_api_proxy_config.dart';
 
 abstract interface class V2boardApi {
   Future<V2boardSession> login(V2boardCredentials credentials);
@@ -86,12 +89,16 @@ class V2boardApiStub implements V2boardApi {
 }
 
 class V2boardApiImpl implements V2boardApi {
-  V2boardApiImpl({Dio? dio}) : _dio = dio ?? Dio();
+  V2boardApiImpl({Dio? dio, this.readApiProxy}) : _dio = dio ?? Dio();
 
   final Dio _dio;
+  final V2etApiProxyConfig? Function()? readApiProxy;
+  DateTime? _lastProxyRefreshAt;
+  String? _lastProxyRule;
 
   @override
   Future<V2boardSession> login(V2boardCredentials credentials) async {
+    _refreshApiProxyIfNeeded();
     late final Response<Object?> response;
     try {
       response = await _postGuestForm(
@@ -175,6 +182,7 @@ class V2boardApiImpl implements V2boardApi {
 
   @override
   Future<V2boardSubscription> fetchSubscription(V2boardSession session) async {
+    _refreshApiProxyIfNeeded();
     final token = session.accessToken.trim();
     if (token.isEmpty) {
       throw StateError('V2Board token is missing.');
@@ -199,6 +207,7 @@ class V2boardApiImpl implements V2boardApi {
 
   @override
   Future<V2boardAuthConfig> fetchAuthConfig(Uri baseUrl) async {
+    _refreshApiProxyIfNeeded();
     final uri = _joinApi(baseUrl, '/api/v1/guest/comm/config');
     final response = await _dio.getUri<Object?>(uri, options: Options(headers: {'Accept': 'application/json'}));
     final json = _readMap(response.data);
@@ -217,6 +226,7 @@ class V2boardApiImpl implements V2boardApi {
 
   @override
   Future<void> sendEmailVerifyCode({required Uri baseUrl, required String email}) async {
+    _refreshApiProxyIfNeeded();
     try {
       await _postGuestForm(baseUrl: baseUrl, path: '/api/v1/passport/comm/sendEmailVerify', data: {'email': email});
     } on DioException catch (error) {
@@ -234,6 +244,7 @@ class V2boardApiImpl implements V2boardApi {
     String? emailCode,
     String? inviteCode,
   }) async {
+    _refreshApiProxyIfNeeded();
     final payload = <String, Object>{'email': email, 'password': password, 'password_confirmation': password};
     if (emailCode != null && emailCode.trim().isNotEmpty) {
       payload['email_code'] = emailCode.trim();
@@ -257,6 +268,7 @@ class V2boardApiImpl implements V2boardApi {
     required String password,
     required String emailCode,
   }) async {
+    _refreshApiProxyIfNeeded();
     try {
       await _postGuestForm(
         baseUrl: baseUrl,
@@ -277,6 +289,7 @@ class V2boardApiImpl implements V2boardApi {
     required String path,
     required Map<String, Object?> data,
   }) async {
+    _refreshApiProxyIfNeeded();
     final uri = _joinApi(baseUrl, path);
     final referer = baseUrl.replace(path: '/').toString();
     final origin = '${baseUrl.scheme}://${baseUrl.host}';
@@ -304,6 +317,7 @@ class V2boardApiImpl implements V2boardApi {
   }
 
   Future<Map<String, dynamic>> _fetchSubscribeJson(Uri baseUrl, String token) async {
+    _refreshApiProxyIfNeeded();
     final uri = _joinApi(baseUrl, '/api/v1/user/getSubscribe');
     for (final authHeader in [token, 'Bearer $token']) {
       final response = await _dio.getUri<Object?>(
@@ -467,5 +481,26 @@ class V2boardApiImpl implements V2boardApi {
       return null;
     }
     return _readMap(value);
+  }
+
+  void _refreshApiProxyIfNeeded() {
+    final now = DateTime.now();
+    if (_lastProxyRefreshAt != null && now.difference(_lastProxyRefreshAt!).inSeconds < 15) {
+      return;
+    }
+    _lastProxyRefreshAt = now;
+    final proxy = readApiProxy?.call();
+    final rule = (proxy != null && proxy.isUsable) ? proxy.findProxyRule : 'DIRECT';
+    if (rule == _lastProxyRule) {
+      return;
+    }
+    _lastProxyRule = rule;
+    _dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.findProxy = (_) => rule;
+        return client;
+      },
+    );
   }
 }

@@ -5,7 +5,7 @@ import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 final v2etPortalApiProvider = Provider<V2etPortalApi>((ref) {
-  return V2etPortalApi();
+  return V2etPortalApi(readApiProxy: () => ref.read(v2etRuntimeConfigProvider).valueOrNull?.apiProxy);
 });
 
 final v2etNoticesProvider = FutureProvider<List<V2etNotice>>((ref) async {

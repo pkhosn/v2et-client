@@ -179,7 +179,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     }, [guard, warnExpirySoon, warnTrafficSoon]);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F2F8),
+      backgroundColor: V2etThemePalette.appBg(context),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, viewport) {
@@ -282,7 +282,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                     : MediaQuery.of(ctx).size.height * 0.86;
                                 final sheetHeight = estimatedHeight.clamp(430.0, maxAllowed);
                                 return Dialog(
-                                  backgroundColor: const Color(0xFFF5F2F8),
+                                  backgroundColor: V2etThemePalette.appBg(context),
                                   insetPadding: EdgeInsets.symmetric(
                                     horizontal: isMobileSheet ? 12 : 120,
                                     vertical: isMobileSheet ? 64 : 66,

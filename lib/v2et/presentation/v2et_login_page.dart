@@ -100,6 +100,7 @@ class V2etLoginPage extends HookConsumerWidget {
     final accentColor = ref.watch(v2etAccentColorProvider);
     final supportUri = buildV2etSupportUri(runtimeConfig);
     final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
+    final isDark = V2etThemePalette.isDark(context);
 
     final modeTitle = switch (authMode.value) {
       _AuthMode.login => tr('登录', 'Login'),
@@ -173,7 +174,7 @@ class V2etLoginPage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F2F8),
+      backgroundColor: V2etThemePalette.appBg(context),
       floatingActionButton: !showSupportFab
           ? null
           : FloatingActionButton(
@@ -325,7 +326,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(10),
-                                      color: const Color(0xFFEDE7F4),
+                                      color: isDark ? const Color(0xFF1E2739) : const Color(0xFFEDE7F4),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -343,15 +344,21 @@ class V2etLoginPage extends HookConsumerWidget {
                           const SizedBox(height: 20),
                           Text(
                             modeTitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 48,
-                              color: Color(0xFF4C347C),
+                              color: accentColor,
                               fontWeight: FontWeight.w800,
                               height: 1,
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(modeSubtitle, style: const TextStyle(color: Color(0xFF5F5A67), fontSize: 16)),
+                          Text(
+                            modeSubtitle,
+                            style: TextStyle(
+                              color: isDark ? const Color(0xFFB4BED1) : const Color(0xFF5F5A67),
+                              fontSize: 16,
+                            ),
+                          ),
                           const SizedBox(height: 56),
                           if (authMode.value == _AuthMode.login) ...[
                             _V2etInputField(
@@ -442,6 +449,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                     baseUrl: baseUrl,
                                     config: authConfig,
                                     api: api,
+                                    accentColor: accentColor,
                                     onDone: () => authMode.value = _AuthMode.login,
                                   );
                                 }
@@ -449,6 +457,7 @@ class V2etLoginPage extends HookConsumerWidget {
                                   zh: zh,
                                   baseUrl: baseUrl,
                                   api: api,
+                                  accentColor: accentColor,
                                   onDone: () => authMode.value = _AuthMode.login,
                                 );
                               },
@@ -458,6 +467,7 @@ class V2etLoginPage extends HookConsumerWidget {
                           Row(
                             children: [
                               TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: accentColor),
                                 onPressed: loading.value
                                     ? null
                                     : () => authMode.value = authMode.value == _AuthMode.register
@@ -477,6 +487,7 @@ class V2etLoginPage extends HookConsumerWidget {
                               ),
                               const Spacer(),
                               TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: accentColor),
                                 onPressed: loading.value
                                     ? null
                                     : () => authMode.value = authMode.value == _AuthMode.forgot
@@ -514,6 +525,7 @@ class _RegisterPanel extends StatefulWidget {
     required this.baseUrl,
     required this.config,
     required this.api,
+    required this.accentColor,
     required this.onDone,
   });
 
@@ -521,6 +533,7 @@ class _RegisterPanel extends StatefulWidget {
   final Uri baseUrl;
   final V2boardAuthConfig config;
   final V2boardApi api;
+  final Color accentColor;
   final VoidCallback onDone;
 
   @override
@@ -573,13 +586,14 @@ class _RegisterPanelState extends State<_RegisterPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = V2etThemePalette.isDark(context);
     final suffixes = widget.config.emailWhitelistSuffixes;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDE8F4),
+        color: isDark ? const Color(0xFF1E2739) : const Color(0xFFEDE8F4),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD3CBE0)),
+        border: Border.all(color: isDark ? const Color(0xFF2F3A4E) : const Color(0xFFD3CBE0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,6 +683,7 @@ class _RegisterPanelState extends State<_RegisterPanel> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: widget.accentColor, foregroundColor: Colors.white),
               onPressed: submitting
                   ? null
                   : () async {
@@ -710,11 +725,18 @@ class _RegisterPanelState extends State<_RegisterPanel> {
 }
 
 class _ForgotPasswordPanel extends StatefulWidget {
-  const _ForgotPasswordPanel({required this.zh, required this.baseUrl, required this.api, required this.onDone});
+  const _ForgotPasswordPanel({
+    required this.zh,
+    required this.baseUrl,
+    required this.api,
+    required this.accentColor,
+    required this.onDone,
+  });
 
   final bool zh;
   final Uri baseUrl;
   final V2boardApi api;
+  final Color accentColor;
   final VoidCallback onDone;
 
   @override
@@ -740,12 +762,13 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = V2etThemePalette.isDark(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDE8F4),
+        color: isDark ? const Color(0xFF1E2739) : const Color(0xFFEDE8F4),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD3CBE0)),
+        border: Border.all(color: isDark ? const Color(0xFF2F3A4E) : const Color(0xFFD3CBE0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,6 +819,7 @@ class _ForgotPasswordPanelState extends State<_ForgotPasswordPanel> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: widget.accentColor, foregroundColor: Colors.white),
               onPressed: submitting
                   ? null
                   : () async {
@@ -848,10 +872,14 @@ class _V2etInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = V2etThemePalette.isDark(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 16, color: Color(0xFF2D2A36))),
+        Text(
+          label,
+          style: TextStyle(fontSize: 16, color: isDark ? const Color(0xFFD5DDEE) : const Color(0xFF2D2A36)),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -860,17 +888,17 @@ class _V2etInputField extends StatelessWidget {
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, color: const Color(0xFF5C5966)),
+            prefixIcon: Icon(icon, color: isDark ? const Color(0xFFAFB9CD) : const Color(0xFF5C5966)),
             suffixIcon: trailing,
             filled: true,
-            fillColor: const Color(0xFFF4F1F8),
+            fillColor: V2etThemePalette.cardBg(context),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF94909E), width: 1.3),
+              borderSide: BorderSide(color: isDark ? const Color(0xFF4A556A) : const Color(0xFF94909E), width: 1.3),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF94909E), width: 1.3),
+              borderSide: BorderSide(color: isDark ? const Color(0xFF4A556A) : const Color(0xFF94909E), width: 1.3),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -893,6 +921,7 @@ class _LabeledCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = V2etThemePalette.isDark(context) ? const Color(0xFFD5DDEE) : const Color(0xFF2D2A36);
     return Row(
       children: [
         Checkbox(
@@ -902,7 +931,7 @@ class _LabeledCheckbox extends StatelessWidget {
           side: const BorderSide(color: Color(0xFF6D6878)),
           visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
         ),
-        Text(label, style: const TextStyle(fontSize: 15, color: Color(0xFF2D2A36))),
+        Text(label, style: TextStyle(fontSize: 15, color: textColor)),
       ],
     );
   }

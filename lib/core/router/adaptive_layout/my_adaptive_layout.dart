@@ -98,9 +98,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       }, [runtimeConfig?.defaultPort]);
 
       return Material(
-        color: const Color(0xFFF5F2F8),
+        color: V2etThemePalette.appBg(context),
         child: Scaffold(
-          backgroundColor: const Color(0xFFF5F2F8),
+          backgroundColor: V2etThemePalette.appBg(context),
           body: isMobileBreakpoint
               ? navigationShell
               : Row(
@@ -296,11 +296,12 @@ class _V2etDesktopSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = Theme.of(context).brightness == Brightness.dark ? const Color(0xFFAAB4C8) : const Color(0xFF6D6977);
     return Container(
       width: 78,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF0ECF4),
-        border: Border(right: BorderSide(color: Color(0xFFE4DFEB))),
+      decoration: BoxDecoration(
+        color: V2etThemePalette.sidebarBg(context),
+        border: Border(right: BorderSide(color: V2etThemePalette.sidebarBorder(context))),
       ),
       child: Column(
         children: [
@@ -314,18 +315,18 @@ class _V2etDesktopSidebar extends StatelessWidget {
               accentColor: accentColor,
             ),
           const Spacer(),
-          IconButton(onPressed: onThemeTap, icon: Icon(themeIcon, color: const Color(0xFF6D6977), size: 24)),
+          IconButton(onPressed: onThemeTap, icon: Icon(themeIcon, color: iconColor, size: 24)),
           IconButton(
             onPressed: onNoticeTap,
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF6D6977), size: 24),
+            icon: Icon(Icons.notifications_none_rounded, color: iconColor, size: 24),
           ),
           IconButton(
             onPressed: onSettingsTap,
-            icon: const Icon(Icons.settings_rounded, color: Color(0xFF6D6977), size: 24),
+            icon: Icon(Icons.settings_rounded, color: iconColor, size: 24),
           ),
           IconButton(
             onPressed: onLogoutTap,
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFF6D6977), size: 24),
+            icon: Icon(Icons.logout_rounded, color: iconColor, size: 24),
           ),
           const SizedBox(height: 12),
         ],
@@ -351,6 +352,8 @@ class _V2etNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inactiveIconColor = Theme.of(context).brightness == Brightness.dark ? const Color(0xFFAAB4C8) : const Color(0xFF5A5663);
+    final labelColor = Theme.of(context).brightness == Brightness.dark ? const Color(0xFFD3DBEA) : const Color(0xFF2A2434);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -367,14 +370,14 @@ class _V2etNavItem extends StatelessWidget {
                   color: selected ? accentColor.withOpacity(0.2) : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 21, color: selected ? accentColor : const Color(0xFF5A5663)),
+                child: Icon(icon, size: 21, color: selected ? accentColor : inactiveIconColor),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: const Color(0xFF2A2434),
+                  color: labelColor,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 ),
                 maxLines: 1,
@@ -398,10 +401,12 @@ class _V2etBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inactiveIconColor = Theme.of(context).brightness == Brightness.dark ? const Color(0xFFAAB4C8) : const Color(0xFF5A5663);
+    final labelColor = Theme.of(context).brightness == Brightness.dark ? const Color(0xFFD3DBEA) : const Color(0xFF2A2434);
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF0ECF4),
-        border: Border(top: BorderSide(color: Color(0xFFE4DFEB))),
+      decoration: BoxDecoration(
+        color: V2etThemePalette.sidebarBg(context),
+        border: Border(top: BorderSide(color: V2etThemePalette.sidebarBorder(context))),
       ),
       child: SafeArea(
         top: false,
@@ -426,7 +431,7 @@ class _V2etBottomBar extends StatelessWidget {
                           child: Icon(
                             actions[i].icon,
                             size: 18,
-                            color: selectedIndex == i ? accentColor : const Color(0xFF5A5663),
+                            color: selectedIndex == i ? accentColor : inactiveIconColor,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -434,7 +439,7 @@ class _V2etBottomBar extends StatelessWidget {
                           actions[i].title,
                           style: TextStyle(
                             fontSize: 12,
-                            color: const Color(0xFF2A2434),
+                            color: labelColor,
                             fontWeight: selectedIndex == i ? FontWeight.w600 : FontWeight.w500,
                           ),
                         ),

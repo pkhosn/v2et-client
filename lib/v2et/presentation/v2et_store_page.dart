@@ -10,6 +10,7 @@ import 'package:hiddify/features/profile/notifier/profile_notifier.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
+import 'package:hiddify/v2et/data/v2et_theme_provider.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
@@ -32,7 +33,7 @@ class _V2etStorePageState extends ConsumerState<V2etStorePage> {
     final visibleOffers = offers;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F2F8),
+      backgroundColor: V2etThemePalette.appBg(context),
       body: SafeArea(
         child: ListView(
           padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, 16),
@@ -91,9 +92,9 @@ class _OfferCard extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF4F1F8),
+        color: V2etThemePalette.cardBg(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2DDEA)),
+        border: Border.all(color: V2etThemePalette.cardBorder(context)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -102,13 +103,13 @@ class _OfferCard extends ConsumerWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            color: const Color(0xFFECE8F3),
+            color: V2etThemePalette.cardSoftBg(context),
             child: Text(offer.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           ),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
-            color: const Color(0xFFF2EEF7),
+            color: V2etThemePalette.cardBg(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -137,7 +138,7 @@ class _OfferCard extends ConsumerWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-            color: const Color(0xFFF8F5FB),
+            color: V2etThemePalette.cardBg(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -204,7 +205,7 @@ class _OfferCard extends ConsumerWidget {
                       (e) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE9E4EF),
+                          color: V2etThemePalette.cardSoftBg(context),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(

@@ -116,16 +116,16 @@ class V2etMePage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F2F8),
+      backgroundColor: V2etThemePalette.appBg(context),
       body: SafeArea(
         child: ListView(
           padding: EdgeInsets.fromLTRB(compact ? 12 : 20, compact ? 8 : 14, compact ? 12 : 20, 16),
           children: [
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF4F1F8),
+                color: V2etThemePalette.cardBg(context),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE3DEE9)),
+                border: Border.all(color: V2etThemePalette.cardBorder(context)),
               ),
               padding: const EdgeInsets.all(14),
               child: Column(
@@ -151,7 +151,7 @@ class V2etMePage extends HookConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          color: const Color(0xFFE9E5EF),
+                          color: V2etThemePalette.cardSoftBg(context),
                         ),
                         child: Text(
                           _date(sub?.expiredAt),
@@ -242,9 +242,9 @@ class V2etMePage extends HookConsumerWidget {
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF4F1F8),
+                color: V2etThemePalette.cardBg(context),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE3DEE9)),
+                border: Border.all(color: V2etThemePalette.cardBorder(context)),
               ),
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Column(
@@ -285,7 +285,7 @@ class _ListTileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: const Color(0xFFF1EDF5), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: V2etThemePalette.cardSoftBg(context), borderRadius: BorderRadius.circular(14)),
       child: ListTile(
         dense: true,
         onTap: onTap,

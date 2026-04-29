@@ -516,17 +516,17 @@ class V2etDashboardPage extends HookConsumerWidget {
 
   String _serviceModeKey(ServiceMode mode) {
     if (mode == ServiceMode.tun) return 'tun';
-    if (mode == ServiceMode.systemProxy) return 'global';
-    return 'smart'; // local mixed-port mode
+    if (mode == ServiceMode.systemProxy) return 'smart';
+    return 'global'; // local mixed-port mode
   }
 
   ServiceMode _serviceModeFromKey(String key) {
     return switch (key) {
       'tun' => ServiceMode.tun,
-      // "全局" should actually take over system proxy on desktop.
-      'global' => PlatformUtils.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy,
-      // "智能" keeps local proxy mode.
-      _ => ServiceMode.proxy,
+      // "全局" keeps local mixed-port mode (manual app proxy usage).
+      'global' => ServiceMode.proxy,
+      // "智能" takes over system proxy for one-click usability.
+      _ => PlatformUtils.isDesktop ? ServiceMode.systemProxy : ServiceMode.proxy,
     };
   }
 

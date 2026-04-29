@@ -14,6 +14,7 @@ import 'package:hiddify/v2et/data/v2board_api.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
+import 'package:hiddify/v2et/data/v2et_theme_provider.dart';
 import 'package:hiddify/v2et/model/v2board_credentials.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
@@ -96,6 +97,7 @@ class V2etLoginPage extends HookConsumerWidget {
         const V2boardAuthConfig(requireEmailVerify: false, requireInviteCode: false, emailWhitelistSuffixes: []);
     final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
     final runtimeConfig = runtimeConfigAsync.valueOrNull;
+    final accentColor = ref.watch(v2etAccentColorProvider);
     final supportUri = buildV2etSupportUri(runtimeConfig);
     final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
 
@@ -176,7 +178,7 @@ class V2etLoginPage extends HookConsumerWidget {
           ? null
           : FloatingActionButton(
               mini: true,
-              backgroundColor: const Color(0xFF5A3D89),
+              backgroundColor: accentColor,
               foregroundColor: Colors.white,
               onPressed: () async {
                 var uri = supportUri;
@@ -357,6 +359,7 @@ class V2etLoginPage extends HookConsumerWidget {
                               hint: tr('请输入邮箱', 'Enter email'),
                               icon: Icons.mail_outline_rounded,
                               controller: emailController,
+                              accentColor: accentColor,
                               validator: (value) => (value?.trim().isEmpty ?? true) ? tr('请输入邮箱', 'Enter email') : null,
                             ),
                             const SizedBox(height: 16),
@@ -365,6 +368,7 @@ class V2etLoginPage extends HookConsumerWidget {
                               hint: tr('请输入密码', 'Enter password'),
                               icon: Icons.lock_outline_rounded,
                               controller: passwordController,
+                              accentColor: accentColor,
                               obscureText: obscurePassword.value,
                               trailing: IconButton(
                                 onPressed: () => obscurePassword.value = !obscurePassword.value,
@@ -381,12 +385,14 @@ class V2etLoginPage extends HookConsumerWidget {
                                 _LabeledCheckbox(
                                   label: tr('记住密码', 'Remember password'),
                                   value: rememberPassword.value,
+                                  accentColor: accentColor,
                                   onChanged: (v) => rememberPassword.value = v ?? false,
                                 ),
                                 const Spacer(),
                                 _LabeledCheckbox(
                                   label: tr('自动登录', 'Auto Login'),
                                   value: autoLogin.value,
+                                  accentColor: accentColor,
                                   onChanged: (v) => autoLogin.value = v ?? false,
                                 ),
                               ],
@@ -396,7 +402,7 @@ class V2etLoginPage extends HookConsumerWidget {
                               width: double.infinity,
                               child: FilledButton(
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF573C87),
+                                  backgroundColor: accentColor,
                                   foregroundColor: Colors.white,
                                   minimumSize: const Size.fromHeight(56),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -826,6 +832,7 @@ class _V2etInputField extends StatelessWidget {
     required this.icon,
     required this.controller,
     required this.validator,
+    required this.accentColor,
     this.obscureText = false,
     this.trailing,
   });
@@ -835,6 +842,7 @@ class _V2etInputField extends StatelessWidget {
   final IconData icon;
   final TextEditingController controller;
   final String? Function(String?) validator;
+  final Color accentColor;
   final bool obscureText;
   final Widget? trailing;
 
@@ -866,7 +874,7 @@ class _V2etInputField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF573C87), width: 1.5),
+              borderSide: BorderSide(color: accentColor, width: 1.5),
             ),
           ),
         ),
@@ -876,11 +884,12 @@ class _V2etInputField extends StatelessWidget {
 }
 
 class _LabeledCheckbox extends StatelessWidget {
-  const _LabeledCheckbox({required this.label, required this.value, required this.onChanged});
+  const _LabeledCheckbox({required this.label, required this.value, required this.onChanged, required this.accentColor});
 
   final String label;
   final bool value;
   final ValueChanged<bool?> onChanged;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -889,7 +898,7 @@ class _LabeledCheckbox extends StatelessWidget {
         Checkbox(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color(0xFF573C87),
+          activeColor: accentColor,
           side: const BorderSide(color: Color(0xFF6D6878)),
           visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
         ),

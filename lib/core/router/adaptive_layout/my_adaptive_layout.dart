@@ -17,6 +17,7 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
+import 'package:hiddify/v2et/data/v2et_theme_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class MyAdaptiveLayout extends HookConsumerWidget {
@@ -80,7 +81,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       final themeMode = ref.watch(themePreferencesProvider);
       final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
       final runtimeConfig = runtimeConfigAsync.valueOrNull;
-      final accentColor = _parseColorHex(runtimeConfig?.primaryColorHex) ?? const Color(0xFF5A3D89);
+      final accentColor = ref.watch(v2etAccentColorProvider);
       final supportUri = buildV2etSupportUri(runtimeConfig);
       final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
 
@@ -175,6 +176,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                   actions: actions,
                   selectedIndex: navigationShell.currentIndex,
                   onTap: (index) => _onTap(context, index),
+                  accentColor: accentColor,
                 )
               : null,
         ),
@@ -267,17 +269,6 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();
   List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) =>
       actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
-}
-
-Color? _parseColorHex(String? raw) {
-  final value = (raw ?? '').trim();
-  if (value.isEmpty) return null;
-  var hex = value.replaceFirst('#', '');
-  if (hex.length == 6) hex = 'FF$hex';
-  if (hex.length != 8) return null;
-  final intValue = int.tryParse(hex, radix: 16);
-  if (intValue == null) return null;
-  return Color(intValue);
 }
 
 class _V2etDesktopSidebar extends StatelessWidget {
@@ -398,11 +389,12 @@ class _V2etNavItem extends StatelessWidget {
 }
 
 class _V2etBottomBar extends StatelessWidget {
-  const _V2etBottomBar({required this.actions, required this.selectedIndex, required this.onTap});
+  const _V2etBottomBar({required this.actions, required this.selectedIndex, required this.onTap, required this.accentColor});
 
   final List<ShellRouteAction> actions;
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -428,13 +420,13 @@ class _V2etBottomBar extends StatelessWidget {
                           width: 34,
                           height: 34,
                           decoration: BoxDecoration(
-                            color: selectedIndex == i ? const Color(0xFFE8DBFF) : Colors.transparent,
+                            color: selectedIndex == i ? accentColor.withOpacity(0.2) : Colors.transparent,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             actions[i].icon,
                             size: 18,
-                            color: selectedIndex == i ? const Color(0xFF4D367A) : const Color(0xFF5A5663),
+                            color: selectedIndex == i ? accentColor : const Color(0xFF5A5663),
                           ),
                         ),
                         const SizedBox(height: 2),

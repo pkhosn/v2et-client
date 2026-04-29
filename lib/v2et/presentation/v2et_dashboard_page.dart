@@ -21,6 +21,7 @@ import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
+import 'package:hiddify/v2et/data/v2et_theme_provider.dart';
 import 'package:hiddify/v2et/model/v2board_session.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
@@ -43,6 +44,7 @@ class V2etDashboardPage extends HookConsumerWidget {
     final session = ref.watch(v2etSessionProvider).valueOrNull;
     final notices = ref.watch(v2etNoticesProvider).valueOrNull ?? const [];
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+    final accentColor = ref.watch(v2etAccentColorProvider);
     final noticeTrigger = ref.watch(v2etNoticeDialogTriggerProvider);
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
     final offers = ref.watch(v2etStoreOffersProvider).valueOrNull ?? const <V2etStoreOffer>[];
@@ -194,6 +196,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                         button: _PowerButton(
                           enabled: connectEnabled,
                           active: isConnected,
+                          accentColor: accentColor,
                           onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
                         ),
                       ),
@@ -385,9 +388,9 @@ class V2etDashboardPage extends HookConsumerWidget {
                                                                     mainAxisSize: MainAxisSize.min,
                                                                     children: [
                                                                       if (selectedNode.value == item.selectTag) ...[
-                                                                        const Icon(
+                                                                        Icon(
                                                                           Icons.check_rounded,
-                                                                          color: Color(0xFF5A3D89),
+                                                                          color: accentColor,
                                                                           size: 20,
                                                                         ),
                                                                         const SizedBox(width: 8),
@@ -445,7 +448,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                               Container(
                                 width: 42,
                                 height: 42,
-                                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5F438E)),
+                                decoration: BoxDecoration(shape: BoxShape.circle, color: accentColor),
                                 child: const Icon(Icons.public_rounded, color: Colors.white),
                               ),
                               const SizedBox(width: 12),
@@ -460,7 +463,7 @@ class V2etDashboardPage extends HookConsumerWidget {
                                     const SizedBox(height: 2),
                                     Text(
                                       selectedNode.value ?? tr('自动选择', 'Auto Select'),
-                                      style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700),
+                                      style: TextStyle(color: accentColor, fontWeight: FontWeight.w700),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -479,14 +482,15 @@ class V2etDashboardPage extends HookConsumerWidget {
                           children: [
                             for (final key in const ['smart', 'global', 'tun']) ...[
                               Expanded(
-                                child: _ModeChip(
+                                    child: _ModeChip(
                                   label: switch (key) {
                                     'smart' => tr('智能', 'Smart'),
                                     'global' => tr('全局', 'Global'),
                                     _ => 'TUN',
                                   },
-                                  selected: _serviceModeKey(serviceMode) == key,
-                                  onTap: () async {
+                                      selected: _serviceModeKey(serviceMode) == key,
+                                      accentColor: accentColor,
+                                      onTap: () async {
                                     await ref
                                         .read(ConfigOptions.serviceMode.notifier)
                                         .update(_serviceModeFromKey(key));
@@ -1051,11 +1055,12 @@ class V2etDashboardPage extends HookConsumerWidget {
 }
 
 class _ModeChip extends StatelessWidget {
-  const _ModeChip({required this.label, required this.selected, required this.onTap});
+  const _ModeChip({required this.label, required this.selected, required this.onTap, required this.accentColor});
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1068,14 +1073,14 @@ class _ModeChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: selected ? const Color(0xFF5A3D89) : const Color(0xFFD4CEDD)),
-          color: selected ? const Color(0xFFECE6F7) : const Color(0xFFF7F4FA),
+          border: Border.all(color: selected ? accentColor : const Color(0xFFD4CEDD)),
+          color: selected ? accentColor.withOpacity(0.12) : const Color(0xFFF7F4FA),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: selected ? const Color(0xFF4A2E79) : const Color(0xFF585362),
+            color: selected ? accentColor : const Color(0xFF585362),
           ),
         ),
       ),
@@ -1326,11 +1331,12 @@ class _Card extends StatelessWidget {
 }
 
 class _PowerButton extends HookWidget {
-  const _PowerButton({required this.enabled, required this.active, required this.onTap});
+  const _PowerButton({required this.enabled, required this.active, required this.onTap, required this.accentColor});
 
   final bool enabled;
   final bool active;
   final VoidCallback onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1364,7 +1370,7 @@ class _PowerButton extends HookWidget {
                       height: 140 + t * 70,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0x665A3D89), width: 2),
+                        border: Border.all(color: accentColor.withOpacity(0.4), width: 2),
                       ),
                     ),
                   );
@@ -1378,7 +1384,7 @@ class _PowerButton extends HookWidget {
               gradient: const RadialGradient(colors: [Color(0xFFF9F7FC), Color(0xFFE2DDE9)], radius: 0.78),
               boxShadow: [
                 BoxShadow(
-                  color: active ? const Color(0x555A3D89) : const Color(0x2A3B2A53),
+                  color: active ? accentColor.withOpacity(0.33) : const Color(0x2A3B2A53),
                   blurRadius: active ? 40 : 28,
                   offset: const Offset(0, 12),
                 ),
@@ -1393,7 +1399,7 @@ class _PowerButton extends HookWidget {
                 child: Icon(
                   Icons.power_settings_new_rounded,
                   size: 64,
-                  color: active ? const Color(0xFF573C87) : const Color(0xFF5A5562),
+                  color: active ? accentColor : const Color(0xFF5A5562),
                 ),
               ),
             ),

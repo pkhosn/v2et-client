@@ -8,6 +8,7 @@ import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:hiddify/v2et/data/v2et_support_launcher.dart';
+import 'package:hiddify/v2et/data/v2et_theme_provider.dart';
 import 'package:hiddify/v2et/model/v2et_portal_models.dart';
 import 'package:hiddify/v2et/presentation/v2et_notice.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -25,6 +26,7 @@ class V2etMePage extends HookConsumerWidget {
 
     final counters = ref.watch(v2etCountersProvider).valueOrNull ?? const {'orders': 0, 'tickets': 0};
     final runtimeConfig = ref.watch(v2etRuntimeConfigProvider).valueOrNull;
+    final accentColor = ref.watch(v2etAccentColorProvider);
     final session = ref.watch(v2etSessionProvider).valueOrNull;
     final sub = ref.watch(v2etRepositoryProvider).readLastSubscription();
     final savedCredentialsFuture = useMemoized(() => ref.read(v2etRepositoryProvider).readSavedCredentials());
@@ -131,9 +133,9 @@ class V2etMePage extends HookConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 14,
-                        backgroundColor: Color(0xFF634691),
+                        backgroundColor: accentColor,
                         child: Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 16),
                       ),
                       const SizedBox(width: 10),
@@ -194,7 +196,7 @@ class V2etMePage extends HookConsumerWidget {
                       const Spacer(),
                       Text(
                         '${_bytes(used)} / ${_bytes(total)}',
-                        style: const TextStyle(color: Color(0xFF4C3A7A), fontWeight: FontWeight.w700, fontSize: 16),
+                        style: TextStyle(color: accentColor, fontWeight: FontWeight.w700, fontSize: 16),
                       ),
                     ],
                   ),
@@ -205,7 +207,7 @@ class V2etMePage extends HookConsumerWidget {
                       value: ratio,
                       minHeight: 12,
                       backgroundColor: const Color(0xFFE4E0E8),
-                      color: const Color(0xFF5A3D89),
+                      color: accentColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -224,7 +226,7 @@ class V2etMePage extends HookConsumerWidget {
                     width: double.infinity,
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF573C87),
+                        backgroundColor: accentColor,
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(44),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),

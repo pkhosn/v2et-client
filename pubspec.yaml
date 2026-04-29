@@ -52,7 +52,6 @@ dependencies:
 
   url_launcher: ^6.2.5
   desktop_webview_window: ^0.2.3
-  webview_windows: ^0.4.0
   vclibs: ^0.1.2
   launch_at_startup: ^0.5.1
   sentry_flutter: ^8.14.0

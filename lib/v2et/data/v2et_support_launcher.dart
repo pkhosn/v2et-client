@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hiddify/v2et/data/v2et_runtime_config_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_windows/webview_windows.dart';
 
 Uri? buildV2etSupportUri(V2etRuntimeConfig? config) {
   if (config == null) return null;
@@ -85,23 +86,47 @@ Future<bool> openV2etSupport(
   final url = uri.toString().trim();
   if (url.isEmpty) return false;
 
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-    await showGeneralDialog<void>(
-      context: context,
-      barrierLabel: 'support-popup',
-      barrierColor: Colors.transparent,
-      barrierDismissible: true,
-      transitionDuration: const Duration(milliseconds: 170),
-      pageBuilder: (_, __, ___) => _SupportPopupLayer(uri: uri, title: title, anchorKey: anchorKey),
-      transitionBuilder: (context, animation, _, child) {
-        final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-        return FadeTransition(
-          opacity: curve,
-          child: ScaleTransition(scale: Tween<double>(begin: 0.96, end: 1).animate(curve), child: child),
-        );
-      },
-    );
-    return true;
+  final isDesktop =
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
+  if (isDesktop) {
+    final available = await WebviewWindow.isWebviewAvailable();
+    if (available) {
+      final viewport = MediaQuery.sizeOf(context);
+      final maxWidth = viewport.width > 0 ? viewport.width : 1280;
+      final maxHeight = viewport.height > 0 ? viewport.height : 720;
+      final windowWidth = min(380, maxWidth.round());
+      final windowHeight = min(518, maxHeight.round());
+      final anchorBox = anchorKey?.currentContext?.findRenderObject() as RenderBox?;
+      final anchorTopLeft = anchorBox?.localToGlobal(Offset.zero);
+      final anchorSize = anchorBox?.size;
+      final defaultX = ((maxWidth - windowWidth) / 2).round();
+      final defaultY = ((maxHeight - windowHeight) / 2).round();
+      final posX = anchorTopLeft == null || anchorSize == null
+          ? defaultX
+          : (anchorTopLeft.dx + anchorSize.width - windowWidth).round();
+      final posY = anchorTopLeft == null || anchorSize == null
+          ? defaultY
+          : (anchorTopLeft.dy - windowHeight - 10).round();
+      final launchUrl = _buildDesktopBootstrapPage(url).toString();
+      final webview = await WebviewWindow.create(
+        configuration: CreateConfiguration(
+          title: title,
+          titleBarTopPadding: 0,
+          titleBarHeight: 0,
+          windowWidth: windowWidth,
+          windowHeight: windowHeight,
+          useWindowPositionAndSize: true,
+          windowPosX: max(0, posX),
+          windowPosY: max(0, posY),
+        ),
+      );
+      webview.launch(launchUrl);
+      return true;
+    }
   }
 
   var opened = await launchUrl(uri, mode: LaunchMode.inAppWebView);
@@ -111,162 +136,55 @@ Future<bool> openV2etSupport(
   return opened;
 }
 
-class _SupportPopupLayer extends StatelessWidget {
-  const _SupportPopupLayer({required this.uri, required this.title, required this.anchorKey});
-  final Uri uri;
-  final String title;
-  final GlobalKey? anchorKey;
-
-  @override
-  Widget build(BuildContext context) {
-    const popupSize = Size(380, 518);
-    final screen = MediaQuery.sizeOf(context);
-    final anchorBox = anchorKey?.currentContext?.findRenderObject() as RenderBox?;
-    final anchorTopLeft = anchorBox?.localToGlobal(Offset.zero) ?? Offset(screen.width - 56, screen.height - 56);
-    final anchorSize = anchorBox?.size ?? const Size(40, 40);
-    final desiredLeft = anchorTopLeft.dx + anchorSize.width - popupSize.width;
-    final desiredTop = anchorTopLeft.dy - popupSize.height - 10;
-    final left = desiredLeft.clamp(8.0, screen.width - popupSize.width - 8);
-    final top = desiredTop.clamp(8.0, screen.height - popupSize.height - 8);
-
-    return Material(
-      color: Colors.transparent,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-          ),
-          Positioned(
-            left: left,
-            top: top,
-            width: popupSize.width,
-            height: popupSize.height,
-            child: _SupportPopupCard(uri: uri, title: title),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportPopupCard extends StatefulWidget {
-  const _SupportPopupCard({required this.uri, required this.title});
-  final Uri uri;
-  final String title;
-
-  @override
-  State<_SupportPopupCard> createState() => _SupportPopupCardState();
-}
-
-class _SupportPopupCardState extends State<_SupportPopupCard> {
-  final _controller = WebviewController();
-  bool _loading = true;
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      await _controller.initialize();
-      await _controller.loadUrl(widget.uri.toString());
-      if (mounted) {
-        setState(() {
-          _ready = true;
-        });
-      }
-      Future<void>.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-          });
-        }
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _ready = false;
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 30, offset: Offset(0, 12))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Column(
-          children: [
-            Container(
-              height: 46,
-              color: const Color(0xFF0665D0),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.support_agent_rounded, color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(99),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: _ready
-                        ? Webview(_controller)
-                        : const Center(
-                            child: Text('客服加载失败，请稍后重试', style: TextStyle(color: Color(0xFF4B5563), fontSize: 13)),
-                          ),
-                  ),
-                  if (_loading)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.white,
-                        alignment: Alignment.center,
-                        child: const CircularProgressIndicator(strokeWidth: 2.2),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+Uri _buildDesktopBootstrapPage(String targetUrl) {
+  final safeTarget = targetUrl.replaceAll("'", r"\'");
+  final html = '''
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html, body { margin:0; height:100%; background:transparent; overflow:hidden; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; }
+    .shell { position:fixed; inset:0; border-radius:16px; overflow:hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.22); background:#fff; border:1px solid #d7dbe6; }
+    .top { height:46px; background:#0665d0; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 12px; font-weight:700; font-size:15px; }
+    .title { display:flex; align-items:center; gap:8px; }
+    .actions { display:flex; gap:8px; }
+    .btn { width:22px; height:22px; border-radius:999px; border:0; background:rgba(255,255,255,0.18); color:#fff; font-size:13px; cursor:pointer; }
+    .body { position:absolute; top:46px; left:0; right:0; bottom:0; background:#fff; }
+    #loading { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#1e64d8; gap:10px; background:#fff; z-index:2; }
+    .dot { width:24px; height:24px; border-radius:999px; border:3px solid #d6e3fb; border-top-color:#1e64d8; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    iframe { border:0; width:100%; height:100%; display:none; background:#fff; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="title"><span>在线客服</span></div>
+      <div class="actions"><button class="btn" id="refreshBtn" title="刷新">↻</button></div>
+    </div>
+    <div class="body">
+      <div id="loading"><div class="dot"></div><div>正在连接客服...</div></div>
+      <iframe id="frame" src="$safeTarget"></iframe>
+    </div>
+  </div>
+  <script>
+    const frame = document.getElementById('frame');
+    const loading = document.getElementById('loading');
+    const refreshBtn = document.getElementById('refreshBtn');
+    frame.addEventListener('load', () => { loading.style.display = 'none'; frame.style.display = 'block'; });
+    refreshBtn.addEventListener('click', () => {
+      loading.style.display = 'flex';
+      frame.style.display = 'none';
+      frame.src = '$safeTarget';
+    });
+    setTimeout(() => { loading.style.display = 'none'; frame.style.display = 'block'; }, 7000);
+  </script>
+</body>
+</html>
+''';
+  return Uri.parse('data:text/html;charset=utf-8,${Uri.encodeComponent(html)}');
 }
 
 Uri? _parseUri(String? value) {

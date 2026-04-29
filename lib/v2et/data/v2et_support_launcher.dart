@@ -81,6 +81,7 @@ Future<bool> openV2etSupport(
   BuildContext context,
   Uri uri, {
   String title = 'Support',
+  Offset? preferredTopLeft,
 }) async {
   final url = uri.toString().trim();
   if (url.isEmpty) return false;
@@ -99,15 +100,22 @@ Future<bool> openV2etSupport(
       final maxHeight = viewport.height > 0 ? viewport.height : 720;
       final windowWidth = min(380, maxWidth.round());
       final windowHeight = min(518, maxHeight.round());
+      final posX = preferredTopLeft?.dx.round() ?? ((maxWidth - windowWidth) / 2).round();
+      final posY = preferredTopLeft?.dy.round() ?? ((maxHeight - windowHeight) / 2).round();
+      final launchUrl = _buildDesktopBootstrapPage(url).toString();
       final webview = await WebviewWindow.create(
         configuration: CreateConfiguration(
           title: title,
-          titleBarTopPadding: 8,
+          titleBarTopPadding: 0,
+          titleBarHeight: 0,
           windowWidth: windowWidth,
           windowHeight: windowHeight,
+          useWindowPositionAndSize: true,
+          windowPosX: max(0, posX),
+          windowPosY: max(0, posY),
         ),
       );
-      webview.launch(url);
+      webview.launch(launchUrl);
       return true;
     }
   }
@@ -117,6 +125,66 @@ Future<bool> openV2etSupport(
     opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
   return opened;
+}
+
+Uri _buildDesktopBootstrapPage(String targetUrl) {
+  final safeTarget = targetUrl.replaceAll("'", r"\'");
+  final html = '''
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html, body { margin:0; height:100%; background:transparent; overflow:hidden; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; }
+    .shell { position:fixed; inset:0; border-radius:14px; overflow:hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.22); background:#fff; border:1px solid #d7dbe6; }
+    .top { height:48px; background:#1e64d8; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 12px; font-weight:700; font-size:18px; }
+    .title { display:flex; align-items:center; gap:8px; }
+    .title .dot1 { width:10px; height:10px; border-radius:999px; background:#fff; opacity:0.92; }
+    .actions { display:flex; gap:8px; }
+    .btn { width:24px; height:24px; border-radius:999px; border:0; background:rgba(255,255,255,0.18); color:#fff; font-size:14px; cursor:pointer; }
+    .body { position:absolute; top:48px; left:0; right:0; bottom:0; background:#fff; }
+    #loading { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#1e64d8; gap:10px; background:#fff; z-index:2; }
+    .dot { width:24px; height:24px; border-radius:999px; border:3px solid #d6e3fb; border-top-color:#1e64d8; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    iframe { border:0; width:100%; height:100%; display:none; background:#fff; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="title"><div class="dot1"></div><span>在线客服</span></div>
+      <div class="actions">
+        <button class="btn" id="refreshBtn" title="刷新">↻</button>
+      </div>
+    </div>
+    <div class="body">
+      <div id="loading"><div class="dot"></div><div>正在连接客服...</div></div>
+      <iframe id="frame" src="$safeTarget"></iframe>
+    </div>
+  </div>
+  <script>
+    const frame = document.getElementById('frame');
+    const loading = document.getElementById('loading');
+    const refreshBtn = document.getElementById('refreshBtn');
+    frame.addEventListener('load', () => {
+      loading.style.display = 'none';
+      frame.style.display = 'block';
+    });
+    refreshBtn.addEventListener('click', () => {
+      loading.style.display = 'flex';
+      frame.style.display = 'none';
+      frame.src = '$safeTarget';
+    });
+    setTimeout(() => {
+      loading.style.display = 'none';
+      frame.style.display = 'block';
+    }, 7000);
+  </script>
+</body>
+</html>
+''';
+  return Uri.parse('data:text/html;charset=utf-8,${Uri.encodeComponent(html)}');
 }
 
 Uri? _parseUri(String? value) {

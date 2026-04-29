@@ -9,6 +9,8 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
 import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
+import 'package:hiddify/core/theme/app_theme_mode.dart';
+import 'package:hiddify/core/theme/theme_preferences.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
@@ -75,8 +77,10 @@ class MyAdaptiveLayout extends HookConsumerWidget {
 
     if (v2etMode) {
       final actions = _actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode);
+      final themeMode = ref.watch(themePreferencesProvider);
       final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
       final runtimeConfig = runtimeConfigAsync.valueOrNull;
+      final accentColor = _parseColorHex(runtimeConfig?.primaryColorHex) ?? const Color(0xFF5A3D89);
       final supportUri = buildV2etSupportUri(runtimeConfig);
       final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
 
@@ -115,6 +119,20 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                           context.go('/v2et-login');
                         }
                       },
+                      onThemeTap: () async {
+                        final next = switch (themeMode) {
+                          AppThemeMode.system => AppThemeMode.light,
+                          AppThemeMode.light => AppThemeMode.dark,
+                          _ => AppThemeMode.system,
+                        };
+                        await ref.read(themePreferencesProvider.notifier).changeThemeMode(next);
+                      },
+                      themeIcon: switch (themeMode) {
+                        AppThemeMode.light => Icons.light_mode_rounded,
+                        AppThemeMode.dark || AppThemeMode.black => Icons.dark_mode_rounded,
+                        AppThemeMode.system => Icons.brightness_auto_rounded,
+                      },
+                      accentColor: accentColor,
                     ),
                     Expanded(child: navigationShell),
                   ],
@@ -123,7 +141,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
               ? null
               : FloatingActionButton(
                   mini: true,
-                  backgroundColor: const Color(0xFF5A3D89),
+                  backgroundColor: accentColor,
                   foregroundColor: Colors.white,
                   onPressed: () async {
                     var uri = supportUri;
@@ -140,7 +158,15 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       }
                       return;
                     }
-                    await openV2etSupport(context, uri, title: zh ? '在线客服' : 'Live Support');
+                    final viewport = MediaQuery.sizeOf(context);
+                    final x = (viewport.width - 388).clamp(8.0, viewport.width);
+                    final y = (viewport.height - 530).clamp(8.0, viewport.height);
+                    await openV2etSupport(
+                      context,
+                      uri,
+                      title: zh ? '在线客服' : 'Live Support',
+                      preferredTopLeft: Offset(x, y),
+                    );
                   },
                   child: const Icon(Icons.support_agent_rounded),
                 ),
@@ -243,6 +269,17 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
 }
 
+Color? _parseColorHex(String? raw) {
+  final value = (raw ?? '').trim();
+  if (value.isEmpty) return null;
+  var hex = value.replaceFirst('#', '');
+  if (hex.length == 6) hex = 'FF$hex';
+  if (hex.length != 8) return null;
+  final intValue = int.tryParse(hex, radix: 16);
+  if (intValue == null) return null;
+  return Color(intValue);
+}
+
 class _V2etDesktopSidebar extends StatelessWidget {
   const _V2etDesktopSidebar({
     required this.actions,
@@ -251,6 +288,9 @@ class _V2etDesktopSidebar extends StatelessWidget {
     required this.onNoticeTap,
     required this.onSettingsTap,
     required this.onLogoutTap,
+    required this.onThemeTap,
+    required this.themeIcon,
+    required this.accentColor,
   });
 
   final List<ShellRouteAction> actions;
@@ -259,6 +299,9 @@ class _V2etDesktopSidebar extends StatelessWidget {
   final VoidCallback onNoticeTap;
   final VoidCallback onSettingsTap;
   final VoidCallback onLogoutTap;
+  final VoidCallback onThemeTap;
+  final IconData themeIcon;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -277,8 +320,10 @@ class _V2etDesktopSidebar extends StatelessWidget {
               label: actions[i].title,
               selected: selectedIndex == i,
               onTap: () => onTap(i),
+              accentColor: accentColor,
             ),
           const Spacer(),
+          IconButton(onPressed: onThemeTap, icon: Icon(themeIcon, color: const Color(0xFF6D6977), size: 24)),
           IconButton(
             onPressed: onNoticeTap,
             icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF6D6977), size: 24),
@@ -299,12 +344,19 @@ class _V2etDesktopSidebar extends StatelessWidget {
 }
 
 class _V2etNavItem extends StatelessWidget {
-  const _V2etNavItem({required this.icon, required this.label, required this.selected, required this.onTap});
+  const _V2etNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.accentColor,
+  });
 
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -321,10 +373,10 @@ class _V2etNavItem extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFFE8DBFF) : Colors.transparent,
+                  color: selected ? accentColor.withOpacity(0.2) : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 21, color: selected ? const Color(0xFF4D367A) : const Color(0xFF5A5663)),
+                child: Icon(icon, size: 21, color: selected ? accentColor : const Color(0xFF5A5663)),
               ),
               const SizedBox(height: 2),
               Text(

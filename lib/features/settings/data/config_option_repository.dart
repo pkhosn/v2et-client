@@ -105,7 +105,7 @@ abstract class ConfigOptions {
 
   static final mixedPort = PreferencesNotifier.create<int, int>(
     "mixed-port",
-    12334,
+    7890,
     validator: (value) => isPort(value.toString()),
   );
 

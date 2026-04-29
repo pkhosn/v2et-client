@@ -226,7 +226,7 @@ class _SupportPopupCardState extends State<_SupportPopupCard> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      title,
+                      widget.title,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
                     ),
                   ),

@@ -98,6 +98,7 @@ class V2etLoginPage extends HookConsumerWidget {
     final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
     final runtimeConfig = runtimeConfigAsync.valueOrNull;
     final accentColor = ref.watch(v2etAccentColorProvider);
+    final supportFabKey = useMemoized(GlobalKey.new);
     final supportUri = buildV2etSupportUri(runtimeConfig);
     final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
     final isDark = V2etThemePalette.isDark(context);
@@ -178,6 +179,7 @@ class V2etLoginPage extends HookConsumerWidget {
       floatingActionButton: !showSupportFab
           ? null
           : FloatingActionButton(
+              key: supportFabKey,
               mini: true,
               backgroundColor: accentColor,
               foregroundColor: Colors.white,
@@ -194,7 +196,7 @@ class V2etLoginPage extends HookConsumerWidget {
                   }
                   return;
                 }
-                await openV2etSupport(context, uri, title: tr('在线客服', 'Live Support'));
+                await openV2etSupport(context, uri, title: tr('在线客服', 'Live Support'), anchorKey: supportFabKey);
               },
               child: const Icon(Icons.support_agent_rounded),
             ),

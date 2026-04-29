@@ -82,6 +82,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
       final runtimeConfig = runtimeConfigAsync.valueOrNull;
       final accentColor = ref.watch(v2etAccentColorProvider);
+      final supportFabKey = useMemoized(GlobalKey.new);
       final supportUri = buildV2etSupportUri(runtimeConfig);
       final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
 
@@ -141,6 +142,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
           floatingActionButton: !showSupportFab
               ? null
               : FloatingActionButton(
+                  key: supportFabKey,
                   mini: true,
                   backgroundColor: accentColor,
                   foregroundColor: Colors.white,
@@ -159,14 +161,11 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       }
                       return;
                     }
-                    final viewport = MediaQuery.sizeOf(context);
-                    final x = (viewport.width - 388).clamp(8.0, viewport.width);
-                    final y = (viewport.height - 530).clamp(8.0, viewport.height);
                     await openV2etSupport(
                       context,
                       uri,
                       title: zh ? '在线客服' : 'Live Support',
-                      preferredTopLeft: Offset(x, y),
+                      anchorKey: supportFabKey,
                     );
                   },
                   child: const Icon(Icons.support_agent_rounded),

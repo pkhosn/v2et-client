@@ -11,7 +11,6 @@ import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.
 import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
 import 'package:hiddify/core/theme/app_theme_mode.dart';
 import 'package:hiddify/core/theme/theme_preferences.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hiddify/v2et/data/v2et_data_providers.dart';
 import 'package:hiddify/v2et/data/v2et_portal_provider.dart';
@@ -77,6 +76,7 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     }, [v2etMode]);
 
     if (v2etMode) {
+      final logoutBusy = useState(false);
       final actions = _actions(t, zh, showProfilesAction, isMobileBreakpoint, v2etMode);
       final themeMode = ref.watch(themePreferencesProvider);
       final runtimeConfigAsync = ref.watch(v2etRuntimeConfigProvider);
@@ -85,18 +85,6 @@ class MyAdaptiveLayout extends HookConsumerWidget {
       final supportFabKey = useMemoized(GlobalKey.new);
       final supportUri = buildV2etSupportUri(runtimeConfig);
       final showSupportFab = supportUri != null || runtimeConfigAsync.isLoading;
-
-      useEffect(() {
-        final port = runtimeConfig?.defaultPort;
-        if (port == null || port <= 0 || port > 65535) {
-          return null;
-        }
-        final current = ref.read(ConfigOptions.mixedPort);
-        if (current != port) {
-          ref.read(ConfigOptions.mixedPort.notifier).update(port);
-        }
-        return null;
-      }, [runtimeConfig?.defaultPort]);
 
       return Material(
         color: V2etThemePalette.appBg(context),
@@ -113,12 +101,22 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                       onNoticeTap: () => ref.read(v2etNoticeDialogTriggerProvider.notifier).state++,
                       onSettingsTap: () => navigationShell.goBranch(3, initialLocation: true),
                       onLogoutTap: () async {
-                        await ref.read(v2etRepositoryProvider).logout();
-                        ref.read(v2etSessionUnlockedProvider.notifier).state = false;
-                        ref.invalidate(v2etSessionProvider);
-                        ref.invalidate(v2etNoticesProvider);
-                        if (context.mounted) {
-                          context.go('/v2et-login');
+                        if (logoutBusy.value) return;
+                        logoutBusy.value = true;
+                        await closeV2etSupportWindowIfAny();
+                        try {
+                          await ref.read(v2etRepositoryProvider).logout();
+                          ref.read(v2etSessionUnlockedProvider.notifier).state = false;
+                          ref.invalidate(v2etSessionProvider);
+                          ref.invalidate(v2etNoticesProvider);
+                          await Future<void>.delayed(const Duration(milliseconds: 80));
+                          if (context.mounted) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (context.mounted) context.go('/v2et-login');
+                            });
+                          }
+                        } finally {
+                          logoutBusy.value = false;
                         }
                       },
                       onThemeTap: () async {
@@ -150,7 +148,9 @@ class MyAdaptiveLayout extends HookConsumerWidget {
                     var uri = supportUri;
                     if (uri == null) {
                       ref.invalidate(v2etRuntimeConfigProvider);
-                      final refreshed = await ref.read(v2etRuntimeConfigProvider.future).catchError((_) => null);
+                      final refreshed = await ref
+                          .read(v2etRuntimeConfigProvider.future)
+                          .then((value) => value, onError: (_, __) => null);
                       uri = buildV2etSupportUri(refreshed);
                     }
                     if (uri == null) {

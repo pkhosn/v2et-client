@@ -197,7 +197,19 @@ class V2etDashboardPage extends HookConsumerWidget {
                           enabled: connectEnabled,
                           active: isConnected,
                           accentColor: accentColor,
-                          onTap: () => ref.read(connectionNotifierProvider.notifier).toggleConnection(),
+                          onTap: () async {
+                            if (!isConnected) {
+                              final mode = ref.read(ConfigOptions.serviceMode);
+                              if (mode != ServiceMode.systemProxy) {
+                                await ref.read(ConfigOptions.serviceMode.notifier).update(ServiceMode.systemProxy);
+                              }
+                              final port = ref.read(ConfigOptions.mixedPort);
+                              if (port <= 0 || port > 65535) {
+                                await ref.read(ConfigOptions.mixedPort.notifier).update(7890);
+                              }
+                            }
+                            await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+                          },
                         ),
                       ),
                       if (guard != _UsageGuard.ok) ...[

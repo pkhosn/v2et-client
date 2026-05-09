@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   desktop_webview_window
   dynamic_color
+  flutter_inappwebview_windows
   flutter_secure_storage_windows
   screen_retriever_windows
   sentry_flutter
@@ -14,6 +15,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   tray_manager
   url_launcher_windows
   vclibs
+  webview_windows
   window_manager
 )
 
